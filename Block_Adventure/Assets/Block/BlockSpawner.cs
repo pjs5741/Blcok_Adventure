@@ -12,7 +12,7 @@ public class BlockSpawner : MonoBehaviour
     public List<ColorDefinition> colorPool;
 
     [Header("References")]
-    public BlockGrid gameGrid;
+    public BlockGrid myGrid;
 
     // 색상 정의용 구조체 (ID와 색상값 짝꿍)
     [System.Serializable]
@@ -58,15 +58,15 @@ public class BlockSpawner : MonoBehaviour
         int randomIndex = Random.Range(0, tetrominoPrefabs.Length);
 
         // 중앙 위치 계산
-        int spawnX = Mathf.RoundToInt(gameGrid.width / 2f);
-        int spawnY = gameGrid.height;
+        int spawnX = Mathf.RoundToInt(myGrid.data.width / 2f);
+        int spawnY = myGrid.data.height;
         Vector3 spawnPos = new Vector3(spawnX, spawnY, 0);
 
         GameObject newBlock = Instantiate(tetrominoPrefabs[randomIndex], spawnPos, Quaternion.identity);
 
         // 연결
         BlockMovement movement = newBlock.GetComponent<BlockMovement>();
-        movement.myGrid = gameGrid;
+        movement.myGrid = myGrid;
         movement.mySpawner = this;
 
         // 색상 주입

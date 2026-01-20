@@ -94,7 +94,7 @@ public class BlockMovement : MonoBehaviour
 
         Vector3 currentPos = transform.position;
         // 일단 천장으로
-        transform.position = new Vector3(currentPos.x, myGrid.height, 0);
+        transform.position = new Vector3(currentPos.x, myGrid.data.height, 0);
 
         // 닿을 때까지 내림
         while (myGrid.IsValidPosition(transform))
@@ -126,6 +126,6 @@ public class BlockMovement : MonoBehaviour
 
     bool TryMove(Vector3 offset) { transform.position += offset; if (IsInsideWalls()) return true; transform.position -= offset; return false; }
     bool CheckOutSideLeft() { foreach (Transform child in transform) if (Mathf.RoundToInt(child.position.x) < 0) return true; return false; }
-    bool CheckOutSideRight() { foreach (Transform child in transform) if (Mathf.RoundToInt(child.position.x) >= myGrid.width) return true; return false; }
-    bool IsInsideWalls() { foreach (Transform child in transform) { int x = Mathf.RoundToInt(child.position.x); if (x < 0 || x >= myGrid.width) return false; } return true; }
+    bool CheckOutSideRight() { foreach (Transform child in transform) if (Mathf.RoundToInt(child.position.x) >= myGrid.data.width) return true; return false; }
+    bool IsInsideWalls() { foreach (Transform child in transform) { int x = Mathf.RoundToInt(child.position.x); if (x < 0 || x >= myGrid.data.width) return false; } return true; }
 }

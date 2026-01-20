@@ -21,20 +21,20 @@ public class Background : MonoBehaviour
     {
         if (targetGrid == null)
         {
-            Debug.LogError("Grid¸¦ ¿¬°áÇØÁÖ¼¼¿ä!");
+            Debug.LogError("Gridï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö¼ï¿½ï¿½ï¿½!");
             return;
         }
 
-        // ¡Ú [¸¸´É °ø½Ä] (±æÀÌ - 1) / 2f
-        // Width 10 -> (9 / 2) = 4.5 (Á¤È®ÇÑ Áß¾Ó)
-        // Width 11 -> (10 / 2) = 5.0 (Á¤È®ÇÑ Áß¾Ó)
-        float centerX = (targetGrid.width - 1) / 2f;
-        float centerY = (targetGrid.height - 1) / 2f;
+        // ï¿½ï¿½ [ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½] (ï¿½ï¿½ï¿½ï¿½ - 1) / 2f
+        // Width 10 -> (9 / 2) = 4.5 (ï¿½ï¿½È®ï¿½ï¿½ ï¿½ß¾ï¿½)
+        // Width 11 -> (10 / 2) = 5.0 (ï¿½ï¿½È®ï¿½ï¿½ ï¿½ß¾ï¿½)
+        float centerX = (targetGrid.data.width - 1) / 2f;
+        float centerY = (targetGrid.data.height - 1) / 2f;
 
-        // ¹è°æ Å©±â´Â ±×¸®µå Å©±â ±×´ë·Î
-        transform.localScale = new Vector3(targetGrid.width, targetGrid.height, 1);
+        // ï¿½ï¿½ï¿½ Å©ï¿½ï¿½ï¿½ ï¿½×¸ï¿½ï¿½ï¿½ Å©ï¿½ï¿½ ï¿½×´ï¿½ï¿½
+        transform.localScale = new Vector3(targetGrid.data.width, targetGrid.data.height, 1);
 
-        // ¹è°æ À§Ä¡´Â °è»êµÈ Áß¾Ó°ª(½Ç¼ö Æ÷ÇÔ)À¸·Î ¹èÄ¡
+        // ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ß¾Ó°ï¿½(ï¿½Ç¼ï¿½ ï¿½ï¿½ï¿½ï¿½)ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡
         transform.localPosition = new Vector3(centerX, centerY, 1);
 
         if (autoCenterCamera)
@@ -42,10 +42,10 @@ public class Background : MonoBehaviour
             Camera mainCam = Camera.main;
             if (mainCam != null)
             {
-                // Ä«¸Þ¶óµµ °è»êµÈ Áß¾ÓÀ» ¹Ù¶óº½
+                // Ä«ï¿½Þ¶ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ß¾ï¿½ï¿½ï¿½ ï¿½Ù¶ï¿½
                 Vector3 worldCenter = transform.parent.TransformPoint(new Vector3(centerX, centerY, cameraDepth));
                 mainCam.transform.position = new Vector3(worldCenter.x, worldCenter.y, cameraDepth);
-                mainCam.orthographicSize = (targetGrid.height / 2f) + padding;
+                mainCam.orthographicSize = (targetGrid.data.height / 2f) + padding;
             }
         }
     }

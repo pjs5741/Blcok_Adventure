@@ -1,4 +1,4 @@
-using UnityEngine;
+/*using UnityEngine;
 
 public class PangMovement : MonoBehaviour
 {
@@ -6,23 +6,23 @@ public class PangMovement : MonoBehaviour
 	public BlockGrid myGrid;
 
 	[Header("Settings")]
-	public float swipeThreshold = 0.5f; // ½º¿ÍÀÌÇÁ ¹Î°¨µµ
+	public float swipeThreshold = 0.5f; // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Î°ï¿½ï¿½ï¿½
 
-	// ³»ºÎ º¯¼ö
+	// ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 	private int startX, startY;
 	private bool isDragging = false;
 	private Vector2 startScreenPos;
 
 	void Update()
 	{
-		// 1. Å¬¸¯ (ÅÍÄ¡ ½ÃÀÛ)
+		// 1. Å¬ï¿½ï¿½ (ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½)
 		if (Input.GetMouseButtonDown(0))
 		{
 			Vector3 worldPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 			startX = Mathf.RoundToInt(worldPos.x);
 			startY = Mathf.RoundToInt(worldPos.y);
 
-			// ¸Ê ¾ÈÂÊÀ» Âï¾úÀ» ¶§¸¸ µå·¡±× ½ÃÀÛ
+			// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½å·¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			if (myGrid.IsValidIndex(startX, startY))
 			{
 				isDragging = true;
@@ -30,28 +30,28 @@ public class PangMovement : MonoBehaviour
 			}
 		}
 
-		// 2. ¶À (½º¿ÍÀÌÇÁ ¹æÇâ °è»ê)
+		// 2. ï¿½ï¿½ (ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½)
 		if (Input.GetMouseButtonUp(0) && isDragging)
 		{
 			isDragging = false;
 			Vector2 endScreenPos = Input.mousePosition;
 			Vector2 direction = endScreenPos - startScreenPos;
 
-			// ³Ê¹« »ìÂ¦ ¿òÁ÷ÀÎ °Ç ¹«½Ã
+			// ï¿½Ê¹ï¿½ ï¿½ï¿½Â¦ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			if (direction.magnitude < swipeThreshold) return;
 
-			// °¡·Î vs ¼¼·Î ÆÇÁ¤
+			// ï¿½ï¿½ï¿½ï¿½ vs ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 			if (Mathf.Abs(direction.x) > Mathf.Abs(direction.y))
 			{
-				// ¡ê ÁÂ¿ì
-				if (direction.x > 0) AttemptSwap(1, 0); // ¿ì
-				else AttemptSwap(-1, 0); // ÁÂ
+				// ï¿½ï¿½ ï¿½Â¿ï¿½
+				if (direction.x > 0) AttemptSwap(1, 0); // ï¿½ï¿½
+				else AttemptSwap(-1, 0); // ï¿½ï¿½
 			}
 			else
 			{
-				// ¢Õ »óÇÏ
-				if (direction.y > 0) AttemptSwap(0, 1); // »ó
-				else AttemptSwap(0, -1); // ÇÏ
+				// ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+				if (direction.y > 0) AttemptSwap(0, 1); // ï¿½ï¿½
+				else AttemptSwap(0, -1); // ï¿½ï¿½
 			}
 		}
 	}
@@ -61,10 +61,10 @@ public class PangMovement : MonoBehaviour
 		int targetX = startX + dx;
 		int targetY = startY + dy;
 
-		// ¸ñÇ¥ ÁöÁ¡µµ ¸Ê ¾ÈÀÌ¾î¾ß ½º¿Ò ½ÇÇà
+		// ï¿½ï¿½Ç¥ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½Ì¾ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 		if (myGrid.IsValidIndex(targetX, targetY))
 		{
 			myGrid.SwapBlocks(startX, startY, targetX, targetY);
 		}
 	}
-}
+}*/

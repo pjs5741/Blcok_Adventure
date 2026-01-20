@@ -5,19 +5,22 @@ using System.Collections.Generic; // 리스트, 해시셋 사용을 위해 필�
 
 public class BlockGrid : MonoBehaviour
 {
-    [Header("Grid Info")]
-    public int width = 11;
-    public int height = 21;
-    public Transform[,] gridArray;
+    public GridData data;
 
     [Header("Animation Settings")]
     public float dropDuration = 0.2f;
+
+    public float destroyDuration = 0.3f; // ✨ 빛나고 터지는 시간 (이만큼 기다렸다가 내려옴)
     public float shakeTime = 0.15f;
     public float shakePower = 0.2f;
+    
+    [Header("Game Status")]
+    public int comboCount = 0; // 콤보 횟수 저장 (외부 UI에서 이거 갖다 쓰면 됨)
+    public float currentDamageMultiplier = 1f; // 데미지 배율
 
     void Awake()
     {
-        gridArray = new Transform[width, height];
+        data = new GridData(11, 21);
     }
 
     // =================================================================
@@ -32,62 +35,175 @@ public class BlockGrid : MonoBehaviour
             int x = Mathf.RoundToInt(pos.x);
             int y = Mathf.RoundToInt(pos.y);
 
-            if (x < 0 || x >= width || y < 0) return false;
-            if (y >= height) continue;
-            if (gridArray[x, y] != null) return false;
+            if (x < 0 || x >= data.width || y < 0) return false;
+            if (y >= data.height) continue;
+            if (data.gridArray[x, y] != null) return false;
         }
         return true;
     }
     // 블록 확정 (콜백 포함)
-    public void AddToGrid(Transform blockParent, Action onComplete)
+   public void AddToGrid(Transform blockParent, Action onComplete)
     {
         foreach (Transform child in blockParent)
         {
             int x = Mathf.RoundToInt(child.position.x);
             int y = Mathf.RoundToInt(child.position.y);
 
-            if (y >= height) { Debug.Log("💀 GAME OVER"); return; }
-            gridArray[x, y] = child;
+            // 게임 오버 체크 (맨 위를 넘어가면)
+            if (y >= data.height) 
+            { 
+                Debug.Log("💀 GAME OVER"); 
+                return; // 여기서 게임 오버 UI 띄우면 됨
+            }
+            data.gridArray[x, y] = child;
         }
-
-        // 1. 테트리스 줄 삭제 검사
-        bool linesCleared = CheckAndClearLines();
-
-        // ★ [추가] 2. 색깔 매칭 검사 (착지하면서 바로 터지는 콤보!)
-        // 줄 삭제가 안 일어났을 때만 검사하거나, 둘 다 하거나 기획 나름이지만
-        // 일단은 둘 다 체크해서 터뜨립니다.
-        bool matchCleared = CheckForMatches();
-
-        // 줄이 지워지거나 색깔이 터졌으면 애니메이션 대기
-        if (linesCleared || matchCleared)
-        {
-            StartCoroutine(WaitAnimations(onComplete));
-        }
-        else
-        {
-            onComplete?.Invoke();
-        }
+        
+        StartCoroutine(ProcessTurn(onComplete));
     }
-    bool CheckAndClearLines()
+
+    // ★ [연쇄 폭발의 심장] 매칭이 없을 때까지 무한 반복하는 코루틴
+    // ★ [핵심] 턴 처리 루프 (모아서 한 번에 터뜨리기)
+    IEnumerator ProcessTurn(Action onTurnEnd)
     {
-        bool anyLineCleared = false;
-        for (int y = 0; y < height; y++)
+        yield return new WaitForSeconds(0.05f);
+
+        bool hasEvent = false;
+        comboCount = 0; // 턴 시작할 때 콤보 초기화 (원하면 누적시켜도 됨)
+        currentDamageMultiplier = 1f;
+
+        do 
+        {
+            hasEvent = false;
+
+            // 1. 🕵️ 검거 단계: 터질 놈들 명단만 확보 (아직 안 터뜨림)
+            HashSet<Transform> lineBlocks = GetLineClearBlocks();   // 테트리스 줄
+            HashSet<Transform> matchBlocks = GetColorMatchBlocks(); // 애니팡 매칭
+
+            // 2. ➕ 합치기 단계: 중복 제거하면서 하나로 합침
+            HashSet<Transform> allToDestroy = new HashSet<Transform>(lineBlocks);
+            allToDestroy.UnionWith(matchBlocks); // 합집합 (Union)
+
+            // 3. ⚖️ 판정 단계: 뭔가 터질 게 있다면?
+            if (allToDestroy.Count > 0)
+            {
+                hasEvent = true;
+                comboCount++; // 콤보 증가!
+
+                // 🔥 [요청하신 기능] 줄 + 색깔 동시에 터졌냐?
+                if (lineBlocks.Count > 0 && matchBlocks.Count > 0)
+                {
+                    currentDamageMultiplier = 2.0f; // 데미지 2배 버프!
+                    Debug.Log($"🚀 대박! 줄+색깔 동시 폭발! (데미지 {currentDamageMultiplier}배)");
+                    
+                    // 여기에 "Excellent!" 같은 특수 UI 이펙트 함수 호출하면 됨
+                }
+                else
+                {
+                    currentDamageMultiplier = 1.0f + (comboCount * 0.1f); // 콤보당 10% 증뎀
+                    Debug.Log($"💥 {comboCount}콤보! ({allToDestroy.Count}개 파괴)");
+                }
+
+                // 4. 💣 집행 단계: 진짜 파괴 실행
+                foreach (Transform t in allToDestroy)
+                {
+                    if (t == null) continue;
+
+                    // 점수 계산 로직이 있다면 여기서 currentDamageMultiplier 곱해서 적용
+                    // GameManager.Score += 100 * currentDamageMultiplier;
+
+                    // 데이터 삭제 (중력 인식을 위해)
+                    int tx = Mathf.RoundToInt(t.position.x);
+                    int ty = Mathf.RoundToInt(t.position.y);
+                    if (IsValidIndex(tx, ty) && data.gridArray[tx, ty] == t) 
+                        data.gridArray[tx, ty] = null;
+
+                    // 비주얼 실행 (빛나고 -> 터짐)
+                    StartCoroutine(AnimateAndDestroy(t));
+                }
+
+                // 터지는 연출 대기
+                if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(0.2f, 0.3f);
+                yield return new WaitForSeconds(destroyDuration + 0.05f);
+
+                // 빈칸 채우기 (중력)
+                ApplyGravity();
+
+                // 떨어지는 시간 대기
+                yield return new WaitForSeconds(dropDuration + 0.1f);
+            }
+            
+        } while (hasEvent);
+
+        onTurnEnd?.Invoke();
+    }
+    
+    HashSet<Transform> GetLineClearBlocks()
+    {
+        HashSet<Transform> targetBlocks = new HashSet<Transform>();
+
+        for (int y = 0; y < data.height; y++)
         {
             if (IsLineFull(y))
             {
-                anyLineCleared = true;
-                DeleteLine(y);
-                DecreaseRowsAboveDataOnly(y + 1);
-                y--;
+                // 이 줄에 있는 모든 블록을 명단에 추가
+                for (int x = 0; x < data.width; x++)
+                {
+                    if (data.gridArray[x, y] != null) targetBlocks.Add(data.gridArray[x, y]);
+                }
             }
         }
+        return targetBlocks;
+    }
+    
+    HashSet<Transform> GetColorMatchBlocks()
+    {
+        bool[,] visited = new bool[data.width, data.height];
+        HashSet<Transform> targetBlocks = new HashSet<Transform>();
 
-        if (anyLineCleared)
+        int[] dx = { 0, 0, -1, 1 };
+        int[] dy = { 1, -1, 0, 0 };
+
+        for (int x = 0; x < data.width; x++)
         {
-            SyncVisualPositions();
-            if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(shakeTime, shakePower);
+            for (int y = 0; y < data.height; y++)
+            {
+                if (data.gridArray[x, y] == null || visited[x, y]) continue;
+                
+                int startColor = GetColorID(data.gridArray[x, y]);
+                if (startColor == 0) continue;
+
+                List<Transform> currentGroup = new List<Transform>();
+                Queue<Vector2Int> queue = new Queue<Vector2Int>();
+
+                queue.Enqueue(new Vector2Int(x, y));
+                visited[x, y] = true;
+                currentGroup.Add(data.gridArray[x, y]);
+
+                while (queue.Count > 0)
+                {
+                    Vector2Int current = queue.Dequeue();
+                    for (int i = 0; i < 4; i++)
+                    {
+                        int nx = current.x + dx[i];
+                        int ny = current.y + dy[i];
+                        if (!IsValidIndex(nx, ny)) continue;
+                        if (visited[nx, ny] || data.gridArray[nx, ny] == null) continue;
+                        if (GetColorID(data.gridArray[nx, ny]) != startColor) continue;
+
+                        visited[nx, ny] = true;
+                        queue.Enqueue(new Vector2Int(nx, ny));
+                        currentGroup.Add(data.gridArray[nx, ny]);
+                    }
+                }
+
+                // 3개 이상이면 명단에 등록
+                if (currentGroup.Count >= 5)
+                {
+                    foreach (Transform t in currentGroup) targetBlocks.Add(t);
+                }
+            }
         }
-        return anyLineCleared;
+        return targetBlocks;
     }
 
     // =================================================================
@@ -97,11 +213,11 @@ public class BlockGrid : MonoBehaviour
     // 좌표 유효성 검사 헬퍼
     public bool IsValidIndex(int x, int y)
     {
-        return x >= 0 && x < width && y >= 0 && y < height;
+        return x >= 0 && x < data.width && y >= 0 && y < data.height;
     }
 
     // ★ [사용자 요청] 스왑 함수 구현
-    public void SwapBlocks(int x1, int y1, int x2, int y2)
+    /*public void SwapBlocks(int x1, int y1, int x2, int y2)
     {
         // 둘 다 비어있으면 무시
         if (gridArray[x1, y1] == null && gridArray[x2, y2] == null) return;
@@ -116,7 +232,7 @@ public class BlockGrid : MonoBehaviour
         if (gridArray[x2, y2] != null) gridArray[x2, y2].position = new Vector3(x2, y2, 0);
 
         // 3. 매칭 검사 및 실패 시 복구 (애니팡 룰)
-        bool hasMatch = CheckForMatches();
+        /*bool hasMatch = CheckForMatches();
 
         if (!hasMatch)
         {
@@ -131,134 +247,36 @@ public class BlockGrid : MonoBehaviour
             if (gridArray[x2, y2] != null) gridArray[x2, y2].position = new Vector3(x2, y2, 0);
 
             Debug.Log("❌ 매칭 실패! 제자리로.");
-        }
-    }
+        }#1#
+    }*/
 
     // N개 이상 매칭 검사 (성공하면 true 리턴)
     // ==========================================
     // 🧠 BFS 기반 매칭 (연결된 덩어리 찾기)
     // ==========================================
-
-    bool CheckForMatches()
-    {
-        bool[,] visited = new bool[width, height]; // 방문 체크 (중복 검사 방지)
-        HashSet<Transform> blocksToDestroy = new HashSet<Transform>(); // 삭제할 놈들 모음
-        bool hasMatch = false;
-
-        // 상하좌우 탐색용
-        int[] dx = { 0, 0, -1, 1 };
-        int[] dy = { 1, -1, 0, 0 };
-
-        // 전체 그리드를 돌면서 탐색
-        for (int x = 0; x < width; x++)
-        {
-            for (int y = 0; y < height; y++)
-            {
-                // 빈칸이거나, 이미 검사한 곳이거나, 색깔이 없으면 패스
-                if (gridArray[x, y] == null || visited[x, y]) continue;
-
-                int startColor = GetColorID(gridArray[x, y]);
-                if (startColor == 0) continue;
-
-                // --- BFS 시작 (Flood Fill) ---
-                List<Transform> currentGroup = new List<Transform>();
-                Queue<Vector2Int> queue = new Queue<Vector2Int>();
-
-                queue.Enqueue(new Vector2Int(x, y));
-                visited[x, y] = true;
-                currentGroup.Add(gridArray[x, y]);
-
-                while (queue.Count > 0)
-                {
-                    Vector2Int current = queue.Dequeue();
-
-                    // 4방향(상하좌우) 확인
-                    for (int i = 0; i < 4; i++)
-                    {
-                        int nx = current.x + dx[i];
-                        int ny = current.y + dy[i];
-
-                        // 맵 밖이면 패스
-                        if (!IsValidIndex(nx, ny)) continue;
-
-                        // 이미 방문했거나, 블록이 없거나, 색이 다르면 패스
-                        if (visited[nx, ny] || gridArray[nx, ny] == null) continue;
-                        if (GetColorID(gridArray[nx, ny]) != startColor) continue;
-
-                        // 같은 색 덩어리 발견!
-                        visited[nx, ny] = true;
-                        queue.Enqueue(new Vector2Int(nx, ny));
-                        currentGroup.Add(gridArray[nx, ny]);
-                    }
-                }
-
-                // --- BFS 끝 ---
-
-                // 뭉친 개수가 3개 이상이면(원하면 5개로 수정) 파괴 리스트에 등록
-                if (currentGroup.Count >= 5)
-                {
-                    foreach (Transform t in currentGroup)
-                    {
-                        blocksToDestroy.Add(t);
-                    }
-                    hasMatch = true;
-                }
-            }
-        }
-
-        // 찾은 놈들 일괄 삭제
-        if (hasMatch)
-        {
-            foreach (Transform t in blocksToDestroy)
-            {
-                if (t == null) continue;
-                int tx = Mathf.RoundToInt(t.position.x);
-                int ty = Mathf.RoundToInt(t.position.y);
-
-                if (IsValidIndex(tx, ty) && gridArray[tx, ty] == t)
-                {
-                    gridArray[tx, ty] = null;
-                }
-                Destroy(t.gameObject);
-            }
-
-            Debug.Log($"🔥 BFS 완료: {blocksToDestroy.Count}개 블록 삭제됨!");
-
-            if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(0.15f, 0.2f);
-            ApplyGravity(); // 삭제했으니 빈칸 채우기
-        }
-
-        return hasMatch;
-    }
-
     // 중력 (빈칸 채우기)
     void ApplyGravity()
     {
-        for (int x = 0; x < width; x++)
+        for (int x = 0; x < data.width; x++)
         {
             int writeY = 0;
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < data.height; y++)
             {
-                if (gridArray[x, y] != null)
+                if (data.gridArray[x, y] != null)
                 {
                     if (y != writeY)
                     {
-                        gridArray[x, writeY] = gridArray[x, y];
-                        gridArray[x, y] = null;
+                        data.gridArray[x, writeY] = data.gridArray[x, y];
+                        data.gridArray[x, y] = null;
 
                         // 부드럽게 떨어지기
-                        StartCoroutine(SmoothMove(gridArray[x, writeY], new Vector3(x, writeY, 0)));
+                        StartCoroutine(SmoothMove(data.gridArray[x, writeY], new Vector3(x, writeY, 0)));
                     }
                     writeY++;
                 }
             }
         }
-        // 연쇄 폭발 체크 (0.4초 뒤)
-        Invoke("CheckForMatchesDelayed", 0.4f);
     }
-
-    // Invoke용 래퍼 함수 (Invoke는 반환형 있는 함수 못 부름)
-    void CheckForMatchesDelayed() { CheckForMatches(); }
 
     // 색깔 ID 가져오기
     int GetColorID(Transform block)
@@ -268,38 +286,45 @@ public class BlockGrid : MonoBehaviour
         return 0;
     }
 
+    // ✨ 블록 파괴 연출 코루틴 (하얗게 빛나다가 터짐)
+    IEnumerator AnimateAndDestroy(Transform blockTransform)
+    {
+        if (blockTransform == null) yield break;
+
+        SpriteRenderer sr = blockTransform.GetComponent<SpriteRenderer>();
+        if (sr != null)
+        {
+            sr.color = new Color(1f, 1f, 1f, 1f); // 하얗게 질리기
+        }
+
+        // ★ 설정한 시간만큼 정확히 대기 (이 동안은 절대 안 움직임)
+        yield return new WaitForSeconds(destroyDuration);
+
+        if (blockTransform != null)
+        {
+            Destroy(blockTransform.gameObject);
+        }
+    }
     // =================================================================
     // 🛠️ 공통 유틸리티
     // =================================================================
 
     bool IsLineFull(int y)
     {
-        for (int x = 0; x < width; x++) if (gridArray[x, y] == null) return false;
+        for (int x = 0; x < data.width; x++) if (data.gridArray[x, y] == null) return false;
         return true;
-    }
-
-    void DeleteLine(int y)
-    {
-        for (int x = 0; x < width; x++)
-        {
-            if (gridArray[x, y] != null)
-            {
-                Destroy(gridArray[x, y].gameObject);
-                gridArray[x, y] = null;
-            }
-        }
     }
 
     void DecreaseRowsAboveDataOnly(int startY)
     {
-        for (int y = startY; y < height; y++)
+        for (int y = startY; y < data.height; y++)
         {
-            for (int x = 0; x < width; x++)
+            for (int x = 0; x < data.width; x++)
             {
-                if (gridArray[x, y] != null)
+                if (data.gridArray[x, y] != null)
                 {
-                    gridArray[x, y - 1] = gridArray[x, y];
-                    gridArray[x, y] = null;
+                    data.gridArray[x, y - 1] = data.gridArray[x, y];
+                    data.gridArray[x, y] = null;
                 }
             }
         }
@@ -307,13 +332,13 @@ public class BlockGrid : MonoBehaviour
 
     void SyncVisualPositions()
     {
-        for (int x = 0; x < width; x++)
+        for (int x = 0; x < data.width; x++)
         {
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < data.height; y++)
             {
-                if (gridArray[x, y] != null)
+                if (data.gridArray[x, y] != null)
                 {
-                    Transform block = gridArray[x, y];
+                    Transform block = data.gridArray[x, y];
                     Vector3 correctPos = new Vector3(x, y, 0);
                     if (Vector3.Distance(block.position, correctPos) > 0.01f)
                     {
