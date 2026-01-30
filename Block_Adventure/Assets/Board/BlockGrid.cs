@@ -1,23 +1,22 @@
 ﻿using UnityEngine;
 using System;
 using System.Collections;
-using System.Collections.Generic; // 리스트, 해시셋 사용을 위해 필수
-
+using System.Collections.Generic;
+using Random = UnityEngine.Random; // 리스트, 해시셋 사용을 위해 필수
+// zz good
 public class BlockGrid : MonoBehaviour
 {
     public GridData data;
+    public BlockSpawner spawner;
 
     [Header("Animation Settings")]
     public float dropDuration = 0.2f;
-
-    public float destroyDuration = 0.3f; // ✨ 빛나고 터지는 시간 (이만큼 기다렸다가 내려옴)
-    public float shakeTime = 0.15f;
-    public float shakePower = 0.2f;
+    public float destroyDuration = 0.3f;
     
     [Header("Game Status")]
-    public int comboCount = 0; // 콤보 횟수 저장 (외부 UI에서 이거 갖다 쓰면 됨)
-    public float currentDamageMultiplier = 1f; // 데미지 배율
-
+    public int comboCount = 0;
+    public float currentDamageMultiplier = 1f;
+    public event Action<float> OnAttackTriggered;
     void Awake()
     {
         data = new GridData(11, 21);
@@ -50,18 +49,14 @@ public class BlockGrid : MonoBehaviour
             int y = Mathf.RoundToInt(child.position.y);
 
             // 게임 오버 체크 (맨 위를 넘어가면)
-            if (y >= data.height) 
-            { 
-                Debug.Log("💀 GAME OVER"); 
-                return; // 여기서 게임 오버 UI 띄우면 됨
-            }
+            LoseGame();
             data.gridArray[x, y] = child;
         }
         
         StartCoroutine(ProcessTurn(onComplete));
     }
 
-    // ★ [연쇄 폭발의 심장] 매칭이 없을 때까지 무한 반복하는 코루틴
+    // ★ [연쇄 폭발의 심장] 매칭이 없을 때까지 무한 반복하는 코루틴.
     // ★ [핵심] 턴 처리 루프 (모아서 한 번에 터뜨리기)
     IEnumerator ProcessTurn(Action onTurnEnd)
     {
@@ -71,7 +66,7 @@ public class BlockGrid : MonoBehaviour
         comboCount = 0; // 턴 시작할 때 콤보 초기화 (원하면 누적시켜도 됨)
         currentDamageMultiplier = 1f;
 
-        do 
+        do
         {
             hasEvent = false;
 
@@ -102,6 +97,10 @@ public class BlockGrid : MonoBehaviour
                     currentDamageMultiplier = 1.0f + (comboCount * 0.1f); // 콤보당 10% 증뎀
                     Debug.Log($"💥 {comboCount}콤보! ({allToDestroy.Count}개 파괴)");
                 }
+                
+                OnAttackTriggered?.Invoke(currentDamageMultiplier); 
+
+                Debug.Log($"💥 {comboCount}콤보! 배율: {currentDamageMultiplier}배");
 
                 // 4. 💣 집행 단계: 진짜 파괴 실행
                 foreach (Transform t in allToDestroy)
@@ -126,7 +125,14 @@ public class BlockGrid : MonoBehaviour
                 yield return new WaitForSeconds(destroyDuration + 0.05f);
 
                 // 빈칸 채우기 (중력)
-                ApplyGravity();
+                if (matchBlocks.Count > 0)
+                {
+                    ApplyGravity();   
+                }
+                else
+                {
+                    ApplyBlockGravity();
+                }
 
                 // 떨어지는 시간 대기
                 yield return new WaitForSeconds(dropDuration + 0.1f);
@@ -141,14 +147,14 @@ public class BlockGrid : MonoBehaviour
     {
         HashSet<Transform> targetBlocks = new HashSet<Transform>();
 
-        for (int y = 0; y < data.height; y++)
-        {
+        for (int y = 0; y < data.height; ++y) 
+        { 
             if (IsLineFull(y))
             {
                 // 이 줄에 있는 모든 블록을 명단에 추가
-                for (int x = 0; x < data.width; x++)
+                for (int x = 0; x < data.width; ++x)
                 {
-                    if (data.gridArray[x, y] != null) targetBlocks.Add(data.gridArray[x, y]);
+                    if (data.gridArray[x, y] is not null) targetBlocks.Add(data.gridArray[x, y]);
                 }
             }
         }
@@ -160,17 +166,16 @@ public class BlockGrid : MonoBehaviour
         bool[,] visited = new bool[data.width, data.height];
         HashSet<Transform> targetBlocks = new HashSet<Transform>();
 
-        int[] dx = { 0, 0, -1, 1 };
+        int[] dx = { 0, 0, -1, 1 }; 
         int[] dy = { 1, -1, 0, 0 };
-
-        for (int x = 0; x < data.width; x++)
+        for (int x = 0; x < data.width; ++x)
         {
-            for (int y = 0; y < data.height; y++)
+            for (int y = 0; y < data.height; ++y)
             {
                 if (data.gridArray[x, y] == null || visited[x, y]) continue;
                 
                 int startColor = GetColorID(data.gridArray[x, y]);
-                if (startColor == 0) continue;
+                if (startColor == 0 || startColor == 99) continue;
 
                 List<Transform> currentGroup = new List<Transform>();
                 Queue<Vector2Int> queue = new Queue<Vector2Int>();
@@ -262,7 +267,7 @@ public class BlockGrid : MonoBehaviour
             int writeY = 0;
             for (int y = 0; y < data.height; y++)
             {
-                if (data.gridArray[x, y] != null)
+                if (data.gridArray[x, y] is not null)
                 {
                     if (y != writeY)
                     {
@@ -311,7 +316,7 @@ public class BlockGrid : MonoBehaviour
 
     bool IsLineFull(int y)
     {
-        for (int x = 0; x < data.width; x++) if (data.gridArray[x, y] == null) return false;
+        for (int x = 0; x < data.width; ++x) if (data.gridArray[x, y] is null) return false;
         return true;
     }
 
@@ -367,5 +372,140 @@ public class BlockGrid : MonoBehaviour
             yield return null;
         }
         if (block != null) block.position = targetPos;
+    }
+    
+    // 테트리스 식: 윗줄을 통째로 당겨 내리기
+    void ApplyBlockGravity()
+    {
+        int writeY = 0; 
+
+        // 2. 바닥(0)부터 꼭대기까지 훑어 올라감
+        for (int y = 0; y < data.height; y++)
+        {
+            // 이 줄이 "살아있는 줄"인가? (빈 줄이 아님)
+            if (!IsLineEmpty(y))
+            {
+                // 현재 줄(y)을 목적지(writeY)로 이동해야 한다면?
+                if (y != writeY)
+                {
+                    // 데이터 복사 (y -> writeY)
+                    CopyRow(y, writeY);
+
+                    // ★ [핵심] 이동한 줄에 있는 모든 블록들에게 "SmoothMove" 명령
+                    for (int x = 0; x < data.width; x++)
+                    {
+                        Transform block = data.gridArray[x, writeY];
+                        if (block != null)
+                        {
+                            // 목표 위치: (x, writeY)
+                            StartCoroutine(SmoothMove(block, new Vector3(x, writeY, 0)));
+                        }
+                    }
+                }
+                
+                // 다음 이사 갈 층수 한 칸 올림
+                writeY++; 
+            }
+            // 만약 빈 줄(IsLineEmpty)이라면? 
+            // writeY는 안 올라가고 y만 올라감 -> 자연스럽게 그 줄은 씹히고 윗줄이 당겨짐
+        }
+
+        // 3. 이사가 다 끝났으니, writeY 위쪽(남은 윗부분)은 싹 청소 (null 처리)
+        for (int y = writeY; y < data.height; y++)
+        {
+            ClearRow(y);
+        }
+    }
+    
+    bool IsLineEmpty(int y)
+    {
+        for (int x = 0; x < data.width; x++)
+            if (data.gridArray[x, y] != null) return false;
+        return true;
+    }
+
+    // [보조 함수] 줄 복사 (단, 원본 삭제는 안 함 - 나중에 ClearRow로 한방에 처리)
+    void CopyRow(int sourceY, int targetY)
+    {
+        for (int x = 0; x < data.width; x++)
+        {
+            data.gridArray[x, targetY] = data.gridArray[x, sourceY];
+            // 주의: 여기서 sourceY를 null로 만들지 않음 (덮어쓰기 방식)
+        }
+    }
+
+    // [보조 함수] 줄 비우기
+    void ClearRow(int y)
+    {
+        for (int x = 0; x < data.width; x++) data.gridArray[x, y] = null;
+    }
+    
+    //몬스터 공격용 함수
+    public void ShiftAllRowsUp()
+    {
+        for (int y = data.height - 2; y >= 0; y--)
+        {
+            for (int x = 0; x < data.width; x++)
+            {
+                Transform block = data.gridArray[x, y];
+                if (block is not null)
+                {
+                    data.gridArray[x, y + 1] = block;
+                    data.gridArray[x, y] = null;
+                    block.position += new Vector3(0, 1, 0); 
+                }
+            }
+        }
+    }
+
+    private void LoseGame()
+    {
+        for (int x = 0; x < data.width; x++)
+        {
+            if (data.gridArray[x, data.height - 1] != null)
+            {
+                Debug.Log("💀 게임 오버! (블록이 천장에 닿았습니다)");
+                // GameManager.Instance.GameOver(); // 실제 게임오버 처리는 여기서 호출
+                return;
+            }
+        }
+    }
+    public void ShiftAndCreateRow(int grayColorID, Color grayColor)
+    {
+        // 1. 먼저 죽는지 확인 (올리기 전에 검사)
+        LoseGame(); 
+
+        // 2. 전체 블록 위로 한 칸씩 이사 (Shift)
+        for (int y = data.height - 2; y >= 0; y--)
+        {
+            for (int x = 0; x < data.width; x++)
+            {
+                Transform block = data.gridArray[x, y];
+                if (block != null)
+                {
+                    data.gridArray[x, y + 1] = block;
+                    data.gridArray[x, y] = null;
+                    block.position += new Vector3(0, 1, 0);
+                }
+            }
+        }
+
+        // 3. 아랫줄 채우기 (Create with Spawner)
+        int holeIndex = Random.Range(0, data.width); // 구멍 뚫을 위치
+
+        for (int x = 0; x < data.width; x++)
+        {
+            if (x == holeIndex) continue; // 구멍은 비워둠
+
+            // ★ 스포너한테 "회색 블록 하나 만들어줘" 요청
+            GameObject newBlockObj = spawner.SpawnStaticBlock(x, 0, grayColorID, grayColor);
+            
+            // 정리 정돈 (Grid 자식으로, 데이터 등록)
+            newBlockObj.transform.SetParent(this.transform);
+            data.gridArray[x, 0] = newBlockObj.transform;
+        }
+        
+        // 다 올리고 나서도 혹시 삐져나갔는지 체크
+        LoseGame();
     }
 }

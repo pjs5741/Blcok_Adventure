@@ -11,11 +11,16 @@ public class Monster : MonoBehaviour
 
     [Header("UI & Visual")]
     [SerializeField] protected Slider hpSlider;
-    [SerializeField] protected SpriteRenderer spriteRenderer;
+    protected SpriteRenderer spriteRenderer;
+    Animator animator;
+    
+    public BlockGrid targetGrid;
 
     // 초기화 (Start 대신 Init을 써서 자식이 제어하기 쉽게 함)
     protected virtual void Start()
     {
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        animator = GetComponent<Animator>();
         Init();
     }
 
@@ -70,5 +75,12 @@ public class Monster : MonoBehaviour
             yield return new WaitForSeconds(0.1f);
             spriteRenderer.color = Color.white;
         }
+    }
+    
+    protected void Attack()
+    {
+        // "그리드야, 한 줄 올리고 회색 깔아라!"
+        // 색깔(Color.gray)과 ID(99)를 넘겨줌
+        targetGrid.ShiftAndCreateRow(99, Color.gray);
     }
 }

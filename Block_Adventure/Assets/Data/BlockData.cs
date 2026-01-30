@@ -1,18 +1,24 @@
 using UnityEngine;
 
-// ¿ìÅ¬¸¯ ¸Ş´º¿¡ 'Tetris > Block Data' ¸Ş´º¸¦ Ãß°¡ÇÔ
+// ï¿½ï¿½Å¬ï¿½ï¿½ ï¿½Ş´ï¿½ï¿½ï¿½ 'Tetris > Block Data' ï¿½Ş´ï¿½ï¿½ï¿½ ï¿½ß°ï¿½ï¿½ï¿½
 [CreateAssetMenu(fileName = "NewBlockData", menuName = "BlockData")]
 public class BlockData : ScriptableObject
 {
-    [Header("±âº» ½ºÅÈ")]
-    public string blockName;        // ºí·Ï ÀÌ¸§ (½Äº°¿ë)
-    public bool allowRotation = true; // È¸Àü °¡´É ¿©ºÎ
+    [Header("ï¿½âº» ï¿½ï¿½ï¿½ï¿½")]
+    public string blockName;        // ï¿½ï¿½ï¿½ ï¿½Ì¸ï¿½ (ï¿½Äºï¿½ï¿½ï¿½)
+    public bool allowRotation = true; // È¸ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
-    [Header("Åõ¸íµµ ¼³Á¤")]
-    public float movingAlpha = 0.5f; // ÀÌµ¿ Áß Åõ¸íµµ
-    public float lockedAlpha = 1.0f; // ¾ÈÂø ÈÄ Åõ¸íµµ
+    [Header("ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½")]
+    public float movingAlpha = 0.5f; // ï¿½Ìµï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
+    public float lockedAlpha = 1.0f; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
 
     [Header("Match-3 Info")]
     // 0:None, 1:Red, 2:Blue, 3:Green, 4:Yellow ...
     public int colorID;
 }
+// wow encoding utf-8 please
+
+//ã…‹ã…‹ã…‹ã…‹ ë‚˜ ì§€ê¸ˆë´£ìŒ ì´ë ‡ê²Œë˜ì–´ìˆë„¤
+
+// why? what?
+// what dirty? no blockdata yes blockgrid

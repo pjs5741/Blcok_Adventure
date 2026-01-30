@@ -1,81 +1,135 @@
-using UnityEngine;
+/*using UnityEngine;
 using System.Collections;
 
-public enum GameState { None, Spawn, Input, Logic, Attack, GameOver }
+// 게임의 상태를 명확하게 정의
+public enum GameState
+{
+    None,
+    Spawn,      // 블록 생성
+    Input,      // 플레이어 조작 (대기)
+    Logic,      // 매칭 계산 & 중력 (조작 불가)
+    Attack,     // 몬스터 공격
+    GameOver
+}
 
 public class GameManager : MonoBehaviour
 {
+    // 어디서든 부를 수 있게 싱글톤
     public static GameManager Instance;
-    
+
+    [Header("Components")]
     public BlockSpawner spawner;
-    public GameGrid gameGrid;
+    public BlockGrid blockGrid;       // GameGrid 대신 BlockGrid
     public BattleManager battleManager;
 
-    public GameState CurrentState { get; private set; }
+    [Header("Status")]
+    public GameState CurrentState;
+    private bool isInputFinished = false; // 조작 끝났는지 체크하는 깃발
 
-    void Awake() => Instance = this;
+    void Awake()
+    {
+        Instance = this;
+    }
 
     void Start()
     {
-        StartCoroutine(GameLoop()); // 게임 시작!
+        StartCoroutine(GameLoop());
     }
 
-    // ★ 이 루프가 게임의 모든 흐름을 통제합니다. (이거 하나만 보면 게임 흐름 파악 가능)
+    // ★ 게임의 심장 (무한 반복)
     IEnumerator GameLoop()
     {
-        while (true) // 무한 반복 (턴제)
+        // 1. 게임 시작 전 초기화 대기
+        yield return new WaitForSeconds(0.5f);
+
+        while (true)
         {
-            // 1. [생성 페이즈] 블록이 없으면 생성
+            // =================================================
+            // PHASE 1. 생성 (Spawn)
+            // =================================================
             CurrentState = GameState.Spawn;
-            spawner.SpawnBlock(); 
-            // 블록이 자리를 잡을 때까지(초기화) 잠깐 대기
-            yield return new WaitForSeconds(0.1f); 
-
-            // 2. [입력 페이즈] 플레이어가 조작할 때까지 대기
-            CurrentState = GameState.Input;
-            // 사용자가 스왑하거나 블록을 놓을 때까지 무한 대기
-            // (PangMovement가 조작을 마치면 isInputFinished를 true로 바꿈)
-            yield return new WaitUntil(() => isInputFinished); 
-            isInputFinished = false; // 리셋
-
-            // 3. [로직 페이즈] 매칭/폭발/중력 (여기가 제일 복잡했던 부분)
-            CurrentState = GameState.Logic;
+            spawner.SpawnBlock();
             
-            bool hasMatch = false;
-            do 
-            {
-                // Grid야, 터질 거 계산해서 명단 내놔 (파괴 안 함, 계산만)
-                var comboList = gameGrid.CalculateMatches(); 
+            // 블록이 생성되고 자리 잡을 때까지 아주 잠깐 대기
+            yield return new WaitForSeconds(0.1f);
 
-                if (comboList.Count > 0)
+
+            // =================================================
+            // PHASE 2. 입력 (Input)
+            // =================================================
+            CurrentState = GameState.Input;
+            isInputFinished = false;
+
+            // 플레이어가 블록을 놓거나, 시간이 다 될 때까지 무한 대기
+            // (BlockMovement에서 FinishInput()을 부르면 통과됨)
+            yield return new WaitUntil(() => isInputFinished);
+
+
+            // =================================================
+            // PHASE 3. 로직 & 연출 (Logic)
+            // =================================================
+            CurrentState = GameState.Logic;
+
+            bool hasMatch = false;
+            do
+            {
+                // 1. 터질 게 있는지 계산만 함 (파괴 X)
+                var matches = blockGrid.CalculateMatches();
+
+                if (matches.Count > 0)
                 {
                     hasMatch = true;
-                    // Grid야, 명단에 있는 애들 연출 보여주고 지워
-                    yield return StartCoroutine(gameGrid.AnimateAndDestroy(comboList));
+
+                    // 2. 파괴 연출 보여줌 (여기서 시간 끔)
+                    yield return StartCoroutine(blockGrid.AnimateAndDestroy(matches));
+
+                    // 3. 빈칸 채우기 (중력)
+                    blockGrid.ApplyGravity();
                     
-                    // Grid야, 빈칸 채워 (중력)
-                    gameGrid.ApplyGravity();
-                    yield return new WaitForSeconds(0.3f); // 떨어지는 시간 대기
+                    // 4. 떨어지는 애니메이션 시간만큼 대기
+                    yield return new WaitForSeconds(0.4f); 
                 }
                 else
                 {
                     hasMatch = false;
                 }
-            } while (hasMatch); // 연쇄 폭발이 없을 때까지 반복
+            } 
+            while (hasMatch); // 연쇄 폭발이 일어난다면 계속 반복
 
-            // 4. [공격 페이즈] 다 터졌으니 정산해서 때리기
+
+            // =================================================
+            // PHASE 4. 공격 (Attack)
+            // =================================================
             CurrentState = GameState.Attack;
-            // 이번 턴 콤보 수만큼 공격
-            battleManager.ExecuteAttack(gameGrid.CurrentComboCount);
-            
-            // 콤보 초기화
-            gameGrid.ResetTurnData(); 
 
-            // 다시 1번(Spawn)으로 돌아감
+            // 이번 턴에 쌓인 콤보만큼 데미지 배율 계산해서 공격
+            if (blockGrid.CurrentComboCount > 0)
+            {
+                // 배틀매니저가 몬스터 때림 (이벤트 방식이면 생략 가능하지만 직접 호출이 명확함)
+                // battleManager.AttackMonster(blockGrid.currentDamageMultiplier);
+            }
+
+            // 턴 데이터 초기화
+            blockGrid.ResetTurnData();
+
+            // 잠깐 쉬고 다시 생성 단계로!
+            yield return new WaitForSeconds(0.2f);
         }
     }
 
-    // PangMovement 등에서 호출할 변수
-    public bool isInputFinished = false;
-    public void FinishInput() => isInputFinished = true;
-}
+    // 외부(BlockMovement)에서 호출하는 버튼
+    public void FinishInput()
+    {
+        isInputFinished = true;
+    }
+
+    // 게임 오버 처리
+    public void SetGameOver()
+    {
+        StopAllCoroutines();
+        CurrentState = GameState.GameOver;
+        Debug.Log("❌ GAME OVER");
+        // UI 띄우기...
+    }
+}*/
+

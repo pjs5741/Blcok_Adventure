@@ -6,6 +6,7 @@ public class BlockSpawner : MonoBehaviour
 {
     [Header("Block Prefabs (모양)")]
     public GameObject[] tetrominoPrefabs; // 로드된 모양들
+    public GameObject basicBlockPrefab;
 
     [Header("Color Pool (색상)")]
     // 인스펙터에서 이 리스트에 색깔을 추가/삭제하면 됨
@@ -86,6 +87,28 @@ public class BlockSpawner : MonoBehaviour
         movement.Initialize();
     }
 
+    public GameObject SpawnStaticBlock(int x, int y, int colorID, Color color)
+    {
+        Vector3 spawnPos = new Vector3(x, y, 0);
+        
+        // 1. 생성
+        GameObject newBlock = Instantiate(basicBlockPrefab, spawnPos, Quaternion.identity);
+        
+        // 2. 색칠 (BlockColor 스크립트 활용)
+        BlockColor blockInfo = newBlock.GetComponent<BlockColor>();
+        if (blockInfo == null) blockInfo = newBlock.AddComponent<BlockColor>();
+        
+        blockInfo.SetColorInfo(colorID, color); // 색상 주입
+
+        // 3. (중요) 이 블록은 움직이면 안 되니 BlockMovement가 있다면 꺼버림
+        if (newBlock.TryGetComponent(out BlockMovement movement))
+        {
+            Destroy(movement); // 혹은 movement.enabled = false;
+        }
+
+        return newBlock; // 만든 놈을 리턴해줌 (그리드에 넣어야 하니까)
+    }
+    
     // ★ [기능 추가] 게임 도중 색상 추가하고 싶을 때 호출
     public void AddColorToPool(int id, Color color)
     {
@@ -97,4 +120,6 @@ public class BlockSpawner : MonoBehaviour
     {
         colorPool.RemoveAll(c => c.id == id);
     }
+    
+    
 }

@@ -1,9 +1,9 @@
 using UnityEngine;
 using System.Collections;
-
+// omg here too
 public class CameraShake : MonoBehaviour
 {
-    // ½Ì±ÛÅæÀ¸·Î ¸¸µé¾î¼­ ¾îµð¼­µç ºÎ¸£±â ½±°Ô ÇÔ
+    // ï¿½Ì±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½î¼­ ï¿½ï¿½ð¼­µï¿½ ï¿½Î¸ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
     public static CameraShake Instance;
 
     private Vector3 originalPos;
@@ -26,7 +26,7 @@ public class CameraShake : MonoBehaviour
     {
         if (shakeDuration > 0)
         {
-            // ·£´ýÇÑ À§Ä¡·Î Ä«¸Þ¶ó¸¦ ¹ÌÄ£µíÀÌ ¶³°Ô ÇÔ
+            // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ï¿½ï¿½ Ä«ï¿½Þ¶ï¿½ ï¿½ï¿½Ä£ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½
             transform.localPosition = originalPos + Random.insideUnitSphere * shakeMagnitude;
 
             shakeDuration -= Time.deltaTime * dampingSpeed;
@@ -34,15 +34,15 @@ public class CameraShake : MonoBehaviour
         else
         {
             shakeDuration = 0f;
-            transform.localPosition = originalPos; // ¿øÀ§Ä¡ º¹±Í
+            transform.localPosition = originalPos; // ï¿½ï¿½ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½
         }
     }
 
-    // ¿ÜºÎ¿¡¼­ ÀÌ ÇÔ¼ö¸¦ È£ÃâÇÏ¸é Èçµé¸²!
+    // ï¿½ÜºÎ¿ï¿½ï¿½ï¿½ ï¿½ï¿½ ï¿½Ô¼ï¿½ï¿½ï¿½ È£ï¿½ï¿½ï¿½Ï¸ï¿½ ï¿½ï¿½é¸²!
     public void TriggerShake(float duration, float magnitude)
     {
         shakeDuration = duration;
         shakeMagnitude = magnitude;
-        originalPos = transform.localPosition; // ÇöÀç À§Ä¡ ±âÁØÁ¡ Àâ±â
+        originalPos = transform.localPosition; // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ä¡ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½
     }
 }
