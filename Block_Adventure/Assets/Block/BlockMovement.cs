@@ -78,10 +78,8 @@ public class BlockMovement : MonoBehaviour
         float endAlpha = (blockData != null) ? blockData.lockedAlpha : 1.0f;
         SetTransparency(endAlpha);
 
-        myGrid.AddToGrid(transform, () =>
-        {
-            if (mySpawner != null) mySpawner.SpawnBlock();
-        });
+        myGrid.AddToGrid(transform);
+        GameManager.Instance?.OnPlayerInputDone();
 
         transform.SetParent(myGrid.transform);
         this.enabled = false;

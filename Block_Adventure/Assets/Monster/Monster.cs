@@ -21,6 +21,7 @@ public class Monster : MonoBehaviour
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
+        targetGrid = FindObjectOfType<BlockGrid>();
         Init();
     }
 
@@ -39,6 +40,7 @@ public class Monster : MonoBehaviour
         currentHp -= damage;
         Debug.Log($"🩸 {gameObject.name} 피격! -{damage}");
 
+        Hit(damage);
         UpdateUI();
         StartCoroutine(HitEffect());
 
@@ -77,10 +79,28 @@ public class Monster : MonoBehaviour
         }
     }
     
-    protected void Attack()
+    public virtual IEnumerator AttackCoroutine()
     {
-        // "그리드야, 한 줄 올리고 회색 깔아라!"
-        // 색깔(Color.gray)과 ID(99)를 넘겨줌
+        animator.SetTrigger("basicAttack");
+
+        yield return new WaitUntil(() =>
+        {
+            var state = animator.GetCurrentAnimatorStateInfo(0);
+            return state.IsName("Basic_Attack") && state.normalizedTime >= 0.5f;
+        });
+
         targetGrid.ShiftAndCreateRow(99, Color.gray);
+    }
+
+    public void Hit(float fDamage)
+    {
+        if (fDamage < maxHp * 0.12)
+            animator.SetTrigger("hit");
+        else
+            KnockBack();
+    }
+    public void KnockBack()
+    {
+        animator.SetTrigger("knockBack");
     }
 }

@@ -44,7 +44,6 @@ public class BlockSpawner : MonoBehaviour
             };
         }
 
-        SpawnBlock();
     }
 
     // (앞부분 기존과 동일, SpawnBlock 함수만 교체)
