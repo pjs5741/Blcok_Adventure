@@ -6,13 +6,11 @@ public class Player : MonoBehaviour
     
     protected SpriteRenderer spriteRenderer;
     public Animator animator;
-    public BlockGrid targetGrid;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+
     void Start()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
-        targetGrid = FindObjectOfType<BlockGrid>();
     }
 
     // 공통 피격 연출 (빨갛게 깜빡)

@@ -4,6 +4,33 @@ using System.Collections.Generic;
 
 public partial class BlockGrid
 {
+    public void ConvertRandomBlocksToGray(int count)
+    {
+        var candidates = new List<Vector2Int>();
+        for (int x = 0; x < data.width; x++)
+            for (int y = 0; y < data.height; y++)
+                if (data.gridArray[x, y] != null)
+                {
+                    BlockColor bc = data.gridArray[x, y].GetComponent<BlockColor>();
+                    if (bc != null && bc.colorID != 99)
+                        candidates.Add(new Vector2Int(x, y));
+                }
+
+        for (int i = candidates.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
+        }
+
+        int converted = Mathf.Min(count, candidates.Count);
+        for (int i = 0; i < converted; i++)
+        {
+            Transform cell = data.gridArray[candidates[i].x, candidates[i].y];
+            BlockColor bc = cell.GetComponent<BlockColor>();
+            if (bc != null) bc.SetColorInfo(99, Color.gray);
+        }
+    }
+
     public IEnumerator ProcessTurn()
     {
         yield return new WaitForSeconds(0.05f);
@@ -124,7 +151,7 @@ public partial class BlockGrid
                     }
                 }
 
-                if (currentGroup.Count >= 5)
+                if (currentGroup.Count >= 15)
                 {
                     foreach (Transform t in currentGroup) targetBlocks.Add(t);
                 }

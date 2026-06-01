@@ -4,25 +4,20 @@ using System.Collections;
 public class BattleManager : MonoBehaviour
 {
     [Header("연결 대상")]
-    public BlockGrid blockGrid;   // 공격 신호를 보낼 그리드
-    public Monster currentMonster; // 맞을 몬스터
+    public Monster currentMonster;
     public Player player;
-    
+
     [Header("데미지 설정")]
-    public float baseDamage = 100f; // 블록 1번 터질 때 기본 데미지
+    public float baseDamage = 100f;
 
     void Awake()
     {
         player = FindFirstObjectByType<Player>();
     }
+
     void Start()
     {
-        // 그리드가 없으면 에러 나니까 체크
-        if (blockGrid != null)
-        {
-            // "그리드에서 공격 신호(OnAttackTriggered)가 오면 -> OnGridAttack을 실행해라"
-            blockGrid.OnAttackTriggered += OnGridAttack;
-        }
+        GameManager.Instance.blockGrid.OnAttackTriggered += OnGridAttack;
     }
 
     // 실제 공격 처리 함수
@@ -47,13 +42,27 @@ public class BattleManager : MonoBehaviour
     public IEnumerator ExecuteMonsterAttack()
     {
         if (HasLivingMonster())
+        {
+            yield return new WaitUntil(() =>
+                !player.animator.GetCurrentAnimatorStateInfo(0).IsName("Player_BasicAttack"));
+
+            player.animator.SetTrigger("hit");
             yield return currentMonster.StartCoroutine(currentMonster.AttackCoroutine());
+        }
+    }
+
+    // [TEST] 실제로는 맵에서 다음 노드 선택 후 새 몬스터 로드해야 함
+    public void RespawnMonster()
+    {
+        if (currentMonster == null) return;
+        currentMonster.gameObject.SetActive(true);
+        currentMonster.Init();
     }
 
     // 게임 꺼질 때 연결 해제 (메모리 관리)
     void OnDestroy()
     {
-        if (blockGrid != null)
-            blockGrid.OnAttackTriggered -= OnGridAttack;
+        if (GameManager.Instance.blockGrid != null)
+            GameManager.Instance.blockGrid.OnAttackTriggered -= OnGridAttack;
     }
 }

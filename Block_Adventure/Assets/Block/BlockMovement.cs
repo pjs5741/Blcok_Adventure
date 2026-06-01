@@ -9,7 +9,10 @@ public class BlockMovement : MonoBehaviour
     public BlockData blockData;
 
     private bool isLocked = false;
-    private bool isInitialized = false; // 초기화 체크
+    private bool isInitialized = false;
+    private float _moveTimer;
+    private float _moveDelay = 0.1f;
+    private float _moveInitDelay = 0.2f;
 
     // ★ Start()를 지우고 이 함수를 만듦
     // 스포너가 모든 세팅을 끝낸 뒤에 이 함수를 호출할 것임
@@ -31,10 +34,13 @@ public class BlockMovement : MonoBehaviour
         // 초기화 안 됐거나, 굳었거나, 그리드 없으면 작동 X
         if (!isInitialized || isLocked || myGrid == null) return;
 
-        // 키 입력 처리
-        if (Input.GetKeyDown(KeyCode.LeftArrow)) MoveHorizontal(Vector3.left);
-        else if (Input.GetKeyDown(KeyCode.RightArrow)) MoveHorizontal(Vector3.right);
-        else if (Input.GetKeyDown(KeyCode.A)) RotateBlock(90);
+        if (Input.GetKeyDown(KeyCode.LeftArrow)) { MoveHorizontal(Vector3.left); _moveTimer = _moveInitDelay; }
+        else if (Input.GetKeyDown(KeyCode.RightArrow)) { MoveHorizontal(Vector3.right); _moveTimer = _moveInitDelay; }
+
+        if (Input.GetKey(KeyCode.LeftArrow)) { _moveTimer -= Time.deltaTime; if (_moveTimer <= 0) { MoveHorizontal(Vector3.left); _moveTimer = _moveDelay; } }
+        else if (Input.GetKey(KeyCode.RightArrow)) { _moveTimer -= Time.deltaTime; if (_moveTimer <= 0) { MoveHorizontal(Vector3.right); _moveTimer = _moveDelay; } }
+
+        if (Input.GetKeyDown(KeyCode.A)) RotateBlock(90);
         else if (Input.GetKeyDown(KeyCode.S)) RotateBlock(-90);
         else if (Input.GetKeyDown(KeyCode.Space)) LockBlock();
     }

@@ -4,8 +4,8 @@ using System.Linq;
 
 public class BlockSpawner : MonoBehaviour
 {
-    [Header("Block Prefabs (모양)")]
-    public GameObject[] tetrominoPrefabs; // 로드된 모양들
+    [Header("Block Deck (모양)")]
+    public List<GameObject> blockDeck = new List<GameObject>();
     public GameObject basicBlockPrefab;
 
     [Header("Color Pool (색상)")]
@@ -14,6 +14,8 @@ public class BlockSpawner : MonoBehaviour
 
     [Header("References")]
     public BlockGrid myGrid;
+
+    private List<GameObject> _shuffleQueue = new List<GameObject>();
 
     // 색상 정의용 구조체 (ID와 색상값 짝꿍)
     [System.Serializable]
@@ -25,9 +27,12 @@ public class BlockSpawner : MonoBehaviour
 
     void Awake()
     {
-        // 1. 모양 프리팹 자동 로드 (기존 기능)
-        GameObject[] allBlocks = Resources.LoadAll<GameObject>("Block");
-        tetrominoPrefabs = allBlocks.Where(b => b.name.StartsWith("Block_")).ToArray();
+        if (blockDeck.Count == 0)
+        {
+            GameObject[] allBlocks = Resources.LoadAll<GameObject>("Block");
+            foreach (var b in allBlocks)
+                if (b.name.StartsWith("Block_")) blockDeck.Add(b);
+        }
     }
 
     void Start()
@@ -49,20 +54,22 @@ public class BlockSpawner : MonoBehaviour
     // (앞부분 기존과 동일, SpawnBlock 함수만 교체)
     public void SpawnBlock()
     {
-        if (tetrominoPrefabs.Length == 0)
+        if (blockDeck.Count == 0)
         {
-            Debug.LogError("🚨 로드된 블록이 없습니다! Resources/Block 폴더를 확인하세요.");
+            Debug.LogError("🚨 블록 덱이 비어있습니다!");
             return;
         }
 
-        int randomIndex = Random.Range(0, tetrominoPrefabs.Length);
+        if (_shuffleQueue.Count == 0) RefillQueue();
+        GameObject prefab = _shuffleQueue[0];
+        _shuffleQueue.RemoveAt(0);
 
         // 중앙 위치 계산
         int spawnX = Mathf.RoundToInt(myGrid.data.width / 2f);
         int spawnY = myGrid.data.height;
         Vector3 spawnPos = new Vector3(spawnX, spawnY, 0);
 
-        GameObject newBlock = Instantiate(tetrominoPrefabs[randomIndex], spawnPos, Quaternion.identity);
+        GameObject newBlock = Instantiate(prefab, spawnPos, Quaternion.identity);
 
         // 연결
         BlockMovement movement = newBlock.GetComponent<BlockMovement>();
@@ -72,13 +79,13 @@ public class BlockSpawner : MonoBehaviour
         // 색상 주입
         if (colorPool.Count > 0)
         {
+            ColorDefinition blockColor = colorPool[Random.Range(0, colorPool.Count)];
             SpriteRenderer[] allRenderers = newBlock.GetComponentsInChildren<SpriteRenderer>();
             foreach (SpriteRenderer sr in allRenderers)
             {
-                ColorDefinition randomColor = colorPool[Random.Range(0, colorPool.Count)];
                 BlockColor blockInfo = sr.GetComponent<BlockColor>();
                 if (blockInfo == null) blockInfo = sr.gameObject.AddComponent<BlockColor>();
-                blockInfo.SetColorInfo(randomColor.id, randomColor.color);
+                blockInfo.SetColorInfo(blockColor.id, blockColor.color);
             }
         }
 
@@ -108,13 +115,34 @@ public class BlockSpawner : MonoBehaviour
         return newBlock; // 만든 놈을 리턴해줌 (그리드에 넣어야 하니까)
     }
     
-    // ★ [기능 추가] 게임 도중 색상 추가하고 싶을 때 호출
+    void RefillQueue()
+    {
+        _shuffleQueue = new List<GameObject>(blockDeck);
+        for (int i = _shuffleQueue.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (_shuffleQueue[i], _shuffleQueue[j]) = (_shuffleQueue[j], _shuffleQueue[i]);
+        }
+    }
+
+    public void AddBlockToPool(GameObject prefab)
+    {
+        blockDeck.Add(prefab);
+        // 현재 큐 랜덤 위치에 끼워넣어 곧 등장하도록
+        int insertAt = Random.Range(0, _shuffleQueue.Count + 1);
+        _shuffleQueue.Insert(insertAt, prefab);
+    }
+
+    public void RemoveBlockFromPool(GameObject prefab)
+    {
+        blockDeck.Remove(prefab);
+    }
+
     public void AddColorToPool(int id, Color color)
     {
         colorPool.Add(new ColorDefinition { id = id, color = color });
     }
 
-    // ★ [기능 추가] 게임 도중 색상 빼고 싶을 때 호출
     public void RemoveColorFromPool(int id)
     {
         colorPool.RemoveAll(c => c.id == id);

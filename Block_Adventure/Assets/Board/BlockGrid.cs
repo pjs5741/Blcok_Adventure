@@ -20,7 +20,7 @@ public partial class BlockGrid : MonoBehaviour
     void Awake()
     {
         data = new GridData(11, 21);
-        spawner = FindObjectOfType<BlockSpawner>();
+        spawner = FindFirstObjectByType<BlockSpawner>();
     }
 
     public bool IsValidPosition(Transform blockParent)

@@ -7,6 +7,7 @@ public enum GameState
     Calculate,
     MonsterTurn,
     GameOverCheck,
+    Reward,
     GameOver,
     GameClear
 }
@@ -19,6 +20,7 @@ public class GameManager : MonoBehaviour
     public BlockSpawner spawner;
     public BlockGrid blockGrid;
     public BattleManager battleManager;
+    public RewardManager rewardManager;
 
     [Header("Monster Settings")]
     public int monsterAttackInterval = 3;
@@ -31,13 +33,14 @@ public class GameManager : MonoBehaviour
     void Awake()
     {
         Instance = this;
+        spawner = FindFirstObjectByType<BlockSpawner>();
+        blockGrid = FindFirstObjectByType<BlockGrid>();
+        battleManager = FindFirstObjectByType<BattleManager>();
+        rewardManager = FindFirstObjectByType<RewardManager>();
     }
 
     void Start()
     {
-        spawner = FindObjectOfType<BlockSpawner>();
-        blockGrid = FindObjectOfType<BlockGrid>();
-        battleManager = FindObjectOfType<BattleManager>();
         StartCoroutine(GameLoop());
     }
 
@@ -56,7 +59,7 @@ public class GameManager : MonoBehaviour
             yield return StartCoroutine(MonsterTurnPhase());
             if (IsTerminated()) break;
 
-            GameOverCheckPhase();
+            yield return StartCoroutine(GameOverCheckPhase());
         }
     }
 
@@ -91,20 +94,29 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    void GameOverCheckPhase()
+    IEnumerator GameOverCheckPhase()
     {
         CurrentState = GameState.GameOverCheck;
 
         if (blockGrid.IsGameOver())
         {
             SetGameOver();
-            return;
+            yield break;
         }
 
         if (battleManager != null && !battleManager.HasLivingMonster())
         {
-            SetGameClear();
+            yield return StartCoroutine(RewardPhase());
+            // [TEST] 실제로는 맵 씬으로 전환 후 다음 노드 선택해야 함
+            battleManager.RespawnMonster();
         }
+    }
+
+    IEnumerator RewardPhase()
+    {
+        CurrentState = GameState.Reward;
+        if (rewardManager != null)
+            yield return StartCoroutine(rewardManager.ShowReward(battleManager.currentMonster));
     }
 
     public void OnPlayerInputDone()

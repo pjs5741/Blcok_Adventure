@@ -1,27 +1,35 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
+using System.Collections.Generic;
+
+public enum MonsterIntent { RowAttack, ConvertBlocks }
 
 public class Monster : MonoBehaviour
 {
     [Header("Base Stats")]
-    [SerializeField] protected float maxHp = 1000f; // 자식에서 접근 가능하게 protected
+    [SerializeField] protected float maxHp = 1000f;
     protected float currentHp;
     protected bool isDead = false;
+
+    [Header("보상 블록")]
+    [SerializeField] protected List<GameObject> rewardPool = new List<GameObject>();
+
+    public virtual List<GameObject> GetRewardPool() => rewardPool;
 
     [Header("UI & Visual")]
     [SerializeField] protected Slider hpSlider;
     protected SpriteRenderer spriteRenderer;
     Animator animator;
-    
-    public BlockGrid targetGrid;
 
-    // 초기화 (Start 대신 Init을 써서 자식이 제어하기 쉽게 함)
+    public MonsterIntent CurrentIntent { get; private set; }
+    protected Text intentText;
+    
     protected virtual void Start()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
-        targetGrid = FindObjectOfType<BlockGrid>();
+        SetupIntentText();
         Init();
     }
 
@@ -30,6 +38,40 @@ public class Monster : MonoBehaviour
         currentHp = maxHp;
         isDead = false;
         UpdateUI();
+        PickIntent();
+    }
+
+    void SetupIntentText()
+    {
+        Canvas canvas = GetComponentInChildren<Canvas>();
+        if (canvas == null) return;
+
+        Transform existing = canvas.transform.Find("IntentText");
+        if (existing != null) { intentText = existing.GetComponent<Text>(); return; }
+
+        GameObject textObj = new GameObject("IntentText");
+        textObj.transform.SetParent(canvas.transform, false);
+        intentText = textObj.AddComponent<Text>();
+        intentText.alignment = TextAnchor.MiddleCenter;
+        intentText.fontSize = 80;
+        intentText.color = Color.yellow;
+        intentText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+        RectTransform rt = textObj.GetComponent<RectTransform>();
+        rt.anchoredPosition = new Vector2(0, 20);
+        rt.sizeDelta = new Vector2(160, 30);
+    }
+
+    public void PickIntent()
+    {
+        CurrentIntent = (MonsterIntent)Random.Range(0, System.Enum.GetValues(typeof(MonsterIntent)).Length);
+        if (intentText == null) return;
+        intentText.text = CurrentIntent switch
+        {
+            MonsterIntent.RowAttack    => "⚔ 줄 추가",
+            MonsterIntent.ConvertBlocks => "☠ 블록 변환",
+            _ => ""
+        };
     }
 
     // 데미지 받는 함수 (virtual: 자식이 덮어쓰기 가능)
@@ -89,7 +131,17 @@ public class Monster : MonoBehaviour
             return state.IsName("Basic_Attack") && state.normalizedTime >= 0.5f;
         });
 
-        targetGrid.ShiftAndCreateRow(99, Color.gray);
+        switch (CurrentIntent)
+        {
+            case MonsterIntent.RowAttack:
+                GameManager.Instance.blockGrid.ShiftAndCreateRow(99, Color.gray);
+                break;
+            case MonsterIntent.ConvertBlocks:
+                GameManager.Instance.blockGrid.ConvertRandomBlocksToGray(3);
+                break;
+        }
+
+        PickIntent();
     }
 
     public void Hit(float fDamage)
