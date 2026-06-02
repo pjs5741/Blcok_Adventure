@@ -12,12 +12,18 @@ public class RewardManager : MonoBehaviour
     public GameObject cardSelectPanel;
     public RewardCard[] rewardCards;
     public Button blockCardButton;
+    public Button relicButton;
     public Button skipButton;
 
     [Header("보상 블록 목록 (빈 경우 Resources/Block 전체 사용)")]
     public GameObject[] rewardBlockPrefabs;
 
     private bool _isProceeded;
+    private RelicHolder relicHolder;
+    private System.Func<Relic>[] relicPool = new System.Func<Relic>[]
+    {
+        () => new Relic_Gladius(),
+    };
 
     void Awake()
     {
@@ -25,6 +31,7 @@ public class RewardManager : MonoBehaviour
         Init();
 
         blockCardButton.onClick.AddListener(ClickBlockButton);
+        relicButton.onClick.AddListener(ClickRelicButton);
         skipButton.onClick.AddListener(ClickSkipButton);
 
         cardSelectPanel.SetActive(false);
@@ -41,10 +48,14 @@ public class RewardManager : MonoBehaviour
             rewardCards = cardSelectPanel.GetComponentsInChildren<RewardCard>(true);
         if (rewardBlockPrefabs == null || rewardBlockPrefabs.Length == 0)
             rewardBlockPrefabs = Resources.LoadAll<GameObject>("RewardBlock");
-        if (blockCardButton == null)                                                                                                                                                  
-            blockCardButton = rewardSelectPanel.transform.Find("BlockCardButton").GetComponent<Button>();                                                                             
+        if (blockCardButton == null)
+            blockCardButton = rewardSelectPanel.transform.Find("BlockCardButton").GetComponent<Button>();
+        if (relicButton == null)
+            relicButton = rewardSelectPanel.transform.Find("RelicButton").GetComponent<Button>();
         if (skipButton == null)
-            skipButton = cardSelectPanel.transform.Find("SkipButton").GetComponent<Button>();
+            skipButton = rewardSelectPanel.transform.Find("SkipButton").GetComponent<Button>();
+        if (relicHolder == null)
+            relicHolder = FindFirstObjectByType<RelicHolder>();
     }
 
     public IEnumerator ShowReward(Monster monster = null)
@@ -59,6 +70,11 @@ public class RewardManager : MonoBehaviour
         for (int i = 0; i < rewardCards.Length; i++)
             rewardCards[i].Setup(pool[Random.Range(0, pool.Length)]);
 
+        blockCardButton.gameObject.SetActive(true);
+        relicButton.gameObject.SetActive(true);
+        skipButton.gameObject.SetActive(true);
+        RealignButtons();
+
         gameObject.SetActive(true);
         rewardSelectPanel.SetActive(true);
 
@@ -72,7 +88,10 @@ public class RewardManager : MonoBehaviour
     public void OnCardSelected(GameObject blockPrefab)
     {
         GameManager.Instance.spawner.AddBlockToPool(blockPrefab);
-        _isProceeded = true;
+        cardSelectPanel.SetActive(false);
+        blockCardButton.gameObject.SetActive(false);
+        RealignButtons();
+        rewardSelectPanel.SetActive(true);
     }
 
     public void ClickBlockButton()
@@ -81,8 +100,38 @@ public class RewardManager : MonoBehaviour
         cardSelectPanel.SetActive(true);
     }
 
+    public void ClickRelicButton()
+    {
+        Relic relic = relicPool[Random.Range(0, relicPool.Length)]();
+        relicHolder.AddRelic(relic);
+        relicButton.gameObject.SetActive(false);
+        RealignButtons();
+    }
+
     public void ClickSkipButton()
     {
         _isProceeded = true;
+    }
+
+    void RealignButtons()
+    {
+        // SkipButton은 고정 위치. 나머지는 위 슬롯부터 채움 (크기 고정)
+        var active = new List<RectTransform>();
+        if (blockCardButton.gameObject.activeSelf) active.Add(blockCardButton.GetComponent<RectTransform>());
+        if (relicButton.gameObject.activeSelf) active.Add(relicButton.GetComponent<RectTransform>());
+
+        const float topY = 0.70f;
+        const float slotHeight = 0.20f;
+        const float spacing = 0.05f;
+
+        for (int i = 0; i < active.Count; i++)
+        {
+            float top = topY - i * (slotHeight + spacing);
+            float bottom = top - slotHeight;
+            active[i].anchorMin = new Vector2(0.2f, bottom);
+            active[i].anchorMax = new Vector2(0.8f, top);
+            active[i].anchoredPosition = Vector2.zero;
+            active[i].sizeDelta = Vector2.zero;
+        }
     }
 }
