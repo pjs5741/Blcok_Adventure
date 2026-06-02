@@ -920,7 +920,8 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 1541412712}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -964,7 +965,7 @@ MonoBehaviour:
   cardSelectPanel: {fileID: 0}
   rewardCards: []
   blockCardButton: {fileID: 0}
-  proceedButton: {fileID: 0}
+  skipButton: {fileID: 0}
   rewardBlockPrefabs: []
 --- !u!114 &937543944
 MonoBehaviour:
@@ -1216,6 +1217,7 @@ GameObject:
   - component: {fileID: 1209864163}
   - component: {fileID: 1209864162}
   - component: {fileID: 1209864165}
+  - component: {fileID: 1209864166}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -1327,7 +1329,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e7d8a4db17a784c1b92fbcc7e6317d05, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  stats:
+    baseDamage: 100
+    comboMultiplier: 0.1
+    matchThreshold: 15
   animator: {fileID: 0}
+--- !u!114 &1209864166
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1209864161}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b96152444aa5044c799e90831f4d8eb6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1213691759
 GameObject:
   m_ObjectHideFlags: 0
@@ -1783,7 +1801,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   currentMonster: {fileID: 1716615815}
   player: {fileID: 0}
-  baseDamage: 100
 --- !u!4 &1526340401
 Transform:
   m_ObjectHideFlags: 0
@@ -1799,6 +1816,68 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1544904631}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1541412711
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1541412712}
+  - component: {fileID: 1541412713}
+  m_Layer: 5
+  m_Name: RelicListPanel
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1541412712
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541412711}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 888850578}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 20, y: -20}
+  m_SizeDelta: {x: 1000, y: 100}
+  m_Pivot: {x: 0, y: 1}
+--- !u!114 &1541412713
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541412711}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30649d3a9faa99c48a7b1166b86bf2a0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_Padding:
+    m_Left: 0
+    m_Right: 0
+    m_Top: 0
+    m_Bottom: 0
+  m_ChildAlignment: 0
+  m_Spacing: 10
+  m_ChildForceExpandWidth: 0
+  m_ChildForceExpandHeight: 0
+  m_ChildControlWidth: 0
+  m_ChildControlHeight: 0
+  m_ChildScaleWidth: 0
+  m_ChildScaleHeight: 0
+  m_ReverseArrangement: 0
 --- !u!1 &1544904630
 GameObject:
   m_ObjectHideFlags: 0
