@@ -61,7 +61,7 @@ public partial class BlockGrid
                 }
                 else
                 {
-                    currentDamageMultiplier = 1.0f + (comboCount * 0.1f);
+                    currentDamageMultiplier = 1.0f + (comboCount * playerStats.comboMultiplier);
                     Debug.Log($"{comboCount}콤보! ({allToDestroy.Count}개 파괴)");
                 }
 
@@ -151,7 +151,7 @@ public partial class BlockGrid
                     }
                 }
 
-                if (currentGroup.Count >= 15)
+                if (currentGroup.Count >= playerStats.matchThreshold)
                 {
                     foreach (Transform t in currentGroup) targetBlocks.Add(t);
                 }

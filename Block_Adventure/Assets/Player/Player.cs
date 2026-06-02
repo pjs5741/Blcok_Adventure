@@ -3,7 +3,8 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
-    
+    public PlayerStats stats = new PlayerStats();
+
     protected SpriteRenderer spriteRenderer;
     public Animator animator;
 

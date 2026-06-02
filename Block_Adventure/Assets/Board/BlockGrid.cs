@@ -17,10 +17,13 @@ public partial class BlockGrid : MonoBehaviour
     public float currentDamageMultiplier = 1f;
     public event Action<float> OnAttackTriggered;
 
+    private PlayerStats playerStats;
+
     void Awake()
     {
         data = new GridData(11, 21);
         spawner = FindFirstObjectByType<BlockSpawner>();
+        playerStats = FindFirstObjectByType<Player>().stats;
     }
 
     public bool IsValidPosition(Transform blockParent)

@@ -7,9 +7,6 @@ public class BattleManager : MonoBehaviour
     public Monster currentMonster;
     public Player player;
 
-    [Header("데미지 설정")]
-    public float baseDamage = 100f;
-
     void Awake()
     {
         player = FindFirstObjectByType<Player>();
@@ -26,7 +23,7 @@ public class BattleManager : MonoBehaviour
         if (currentMonster is not null && currentMonster.gameObject.activeSelf)
         {
             // 최종 데미지 = 기본공격력 * 배율
-            float finalDamage = baseDamage * damageMultiplier;
+            float finalDamage = player.stats.baseDamage * damageMultiplier;
             
             // 몬스터 때리기
             player.Attack();

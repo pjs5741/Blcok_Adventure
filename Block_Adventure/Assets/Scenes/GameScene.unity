@@ -686,14 +686,14 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 60
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\uC9C4\uD589"
+  m_Text: "\uC2A4\uD0B5"
 --- !u!222 &683102123
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -960,8 +960,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d770452b7a6b04932baba0e9e615b6dd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  rewardPanel: {fileID: 0}
+  rewardSelectPanel: {fileID: 0}
+  cardSelectPanel: {fileID: 0}
   rewardCards: []
+  blockCardButton: {fileID: 0}
+  proceedButton: {fileID: 0}
   rewardBlockPrefabs: []
 --- !u!114 &937543944
 MonoBehaviour:
@@ -1388,7 +1391,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 60
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -2072,7 +2075,7 @@ MonoBehaviour:
     m_FontStyle: 0
     m_BestFit: 0
     m_MinSize: 10
-    m_MaxSize: 40
+    m_MaxSize: 80
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
@@ -2115,18 +2118,17 @@ RectTransform:
   m_GameObject: {fileID: 1858582857}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 5}
-  m_LocalScale: {x: 100, y: 100, z: 1}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1799116473}
   - {fileID: 2036632628}
-  - {fileID: 1931398155}
   m_Father: {fileID: 937543947}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.05, y: 0.05}
   m_AnchorMax: {x: 0.95, y: 0.95}
-  m_AnchoredPosition: {x: -550, y: -1050}
-  m_SizeDelta: {x: -2475, y: -1296}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1858582859
 MonoBehaviour:
@@ -2278,6 +2280,7 @@ RectTransform:
   - {fileID: 263805578}
   - {fileID: 1448238917}
   - {fileID: 114284802}
+  - {fileID: 1931398155}
   m_Father: {fileID: 937543947}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.05, y: 0.05}
@@ -2489,7 +2492,7 @@ GameObject:
   - component: {fileID: 1931398157}
   - component: {fileID: 1931398156}
   m_Layer: 5
-  m_Name: ProceedButton
+  m_Name: SkipButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2508,10 +2511,10 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 683102121}
-  m_Father: {fileID: 1858582858}
+  m_Father: {fileID: 1888883112}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.3, y: 0.15}
-  m_AnchorMax: {x: 0.7, y: 0.3}
+  m_AnchorMin: {x: 0.78, y: 0.92}
+  m_AnchorMax: {x: 0.98, y: 0.99}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
@@ -2572,7 +2575,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.35, g: 0.55, b: 0.35, a: 1}
+  m_Color: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
