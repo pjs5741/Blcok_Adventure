@@ -97,7 +97,9 @@ public class Monster : MonoBehaviour
     {
         isDead = true;
         Debug.Log($"💀 {gameObject.name} 사망!");
-        
+
+        GameEvents.RaiseMonsterDeath();
+
         // 기본 사망 연출: 그냥 꺼지기
         gameObject.SetActive(false);
     }

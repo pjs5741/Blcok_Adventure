@@ -23,6 +23,7 @@ public class RewardManager : MonoBehaviour
     private System.Func<Relic>[] relicPool = new System.Func<Relic>[]
     {
         () => new Relic_Gladius(),
+        () => new Relic_Fury(),
     };
 
     void Awake()

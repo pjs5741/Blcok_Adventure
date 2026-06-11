@@ -68,6 +68,7 @@ public class GameManager : MonoBehaviour
         CurrentState = GameState.PlayerTurn;
         _isPlayerInputDone = false;
 
+        GameEvents.RaiseTurnStart();
         spawner.SpawnBlock();
 
         yield return new WaitUntil(() => _isPlayerInputDone);
@@ -92,6 +93,8 @@ public class GameManager : MonoBehaviour
         {
             yield return null;
         }
+
+        GameEvents.RaiseTurnEnd();
     }
 
     IEnumerator GameOverCheckPhase()
