@@ -158,6 +158,14 @@ public class BlockSpawner : MonoBehaviour
     {
         colorPool.RemoveAll(c => c.id == id);
     }
+
+    public Color GetColorByID(int id)
+    {
+        if (id == 99) return Color.gray;
+        foreach (var c in colorPool)
+            if (c.id == id) return c.color;
+        return Color.white;
+    }
     
     
 }

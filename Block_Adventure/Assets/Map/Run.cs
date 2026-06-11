@@ -7,6 +7,7 @@ public static class Run
     public static List<Relic> ownedRelics;
     public static List<string> deckBlockNames;  // 프리팹 이름 (Resources.Load로 복원)
     public static MapState mapState;
+    public static int[,] gridSnapshot;  // [x, y] = colorID (0 = 빈칸). 씬 전환 사이 그리드 유지용
 
     public static bool IsInitialized => stats != null;
 
@@ -22,5 +23,6 @@ public static class Run
             "Block_J", "Block_J"
         };
         mapState = MapState.GenerateFixed();
+        gridSnapshot = null;
     }
 }

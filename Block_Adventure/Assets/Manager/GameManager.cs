@@ -111,6 +111,7 @@ public class GameManager : MonoBehaviour
         if (battleManager != null && !battleManager.HasLivingMonster())
         {
             yield return StartCoroutine(RewardPhase());
+            blockGrid.SaveSnapshot();
             SceneManager.LoadScene("MapScene");
         }
     }

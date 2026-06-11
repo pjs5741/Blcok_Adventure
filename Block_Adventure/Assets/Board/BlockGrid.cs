@@ -26,6 +26,42 @@ public partial class BlockGrid : MonoBehaviour
         playerStats = FindFirstObjectByType<Player>().stats;
     }
 
+    void Start()
+    {
+        LoadSnapshot();
+    }
+
+    public void SaveSnapshot()
+    {
+        int[,] snap = new int[data.width, data.height];
+        for (int x = 0; x < data.width; x++)
+            for (int y = 0; y < data.height; y++)
+                if (data.gridArray[x, y] != null)
+                {
+                    var bc = data.gridArray[x, y].GetComponent<BlockColor>();
+                    snap[x, y] = bc != null ? bc.colorID : 0;
+                }
+        Run.gridSnapshot = snap;
+    }
+
+    public void LoadSnapshot()
+    {
+        if (Run.gridSnapshot == null) return;
+        int[,] snap = Run.gridSnapshot;
+        if (snap.GetLength(0) != data.width || snap.GetLength(1) != data.height) return;
+
+        for (int x = 0; x < data.width; x++)
+            for (int y = 0; y < data.height; y++)
+            {
+                int colorID = snap[x, y];
+                if (colorID == 0) continue;
+                Color color = spawner.GetColorByID(colorID);
+                GameObject block = spawner.SpawnStaticBlock(x, y, colorID, color);
+                block.transform.SetParent(transform);
+                data.gridArray[x, y] = block.transform;
+            }
+    }
+
     public bool IsValidPosition(Transform blockParent)
     {
         foreach (Transform child in blockParent)

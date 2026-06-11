@@ -93,6 +93,7 @@ public class MapManager : MonoBehaviour
             case NodeType.Elite: return new Color(0.5f, 0.1f, 0.6f);
             case NodeType.Shop: return new Color(0.85f, 0.7f, 0.2f);
             case NodeType.Boss: return new Color(0.3f, 0.05f, 0.05f);
+            case NodeType.Rest: return new Color(0.3f, 0.6f, 0.4f);
             default: return Color.white;
         }
     }
@@ -106,6 +107,7 @@ public class MapManager : MonoBehaviour
             case NodeType.Elite: return "엘리트";
             case NodeType.Shop: return "상점";
             case NodeType.Boss: return "보스";
+            case NodeType.Rest: return "휴식";
             default: return "?";
         }
     }
@@ -125,6 +127,9 @@ public class MapManager : MonoBehaviour
                 break;
             case NodeType.Shop:
                 SceneManager.LoadScene("ShopScene");
+                break;
+            case NodeType.Rest:
+                SceneManager.LoadScene("RestScene");
                 break;
         }
     }

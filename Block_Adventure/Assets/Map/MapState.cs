@@ -47,7 +47,7 @@ public class MapState
         //           [0 Start]
         var s = new MapState();
         s.nodes.Add(new MapNode { id = 0, type = NodeType.Start, layer = 0, uiPosition = new Vector2(0, -300), nextNodeIds = new List<int>{1, 2} });
-        s.nodes.Add(new MapNode { id = 1, type = NodeType.Battle, layer = 1, uiPosition = new Vector2(-200, -100), nextNodeIds = new List<int>{3, 4} });
+        s.nodes.Add(new MapNode { id = 1, type = NodeType.Rest, layer = 1, uiPosition = new Vector2(-200, -100), nextNodeIds = new List<int>{3, 4} });
         s.nodes.Add(new MapNode { id = 2, type = NodeType.Battle, layer = 1, uiPosition = new Vector2(200, -100), nextNodeIds = new List<int>{4, 5} });
         s.nodes.Add(new MapNode { id = 3, type = NodeType.Battle, layer = 2, uiPosition = new Vector2(-300, 100), nextNodeIds = new List<int>{6} });
         s.nodes.Add(new MapNode { id = 4, type = NodeType.Shop, layer = 2, uiPosition = new Vector2(0, 100), nextNodeIds = new List<int>{6, 7} });

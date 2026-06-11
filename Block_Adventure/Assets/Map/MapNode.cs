@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum NodeType { Start, Battle, Elite, Shop, Boss }
+public enum NodeType { Start, Battle, Elite, Shop, Boss, Rest }
 
 [System.Serializable]
 public class MapNode
