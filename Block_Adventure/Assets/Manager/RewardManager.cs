@@ -20,11 +20,6 @@ public class RewardManager : MonoBehaviour
 
     private bool _isProceeded;
     private RelicHolder relicHolder;
-    private System.Func<Relic>[] relicPool = new System.Func<Relic>[]
-    {
-        () => new Relic_Gladius(),
-        () => new Relic_Fury(),
-    };
 
     void Awake()
     {
@@ -103,8 +98,7 @@ public class RewardManager : MonoBehaviour
 
     public void ClickRelicButton()
     {
-        Relic relic = relicPool[Random.Range(0, relicPool.Length)]();
-        relicHolder.AddRelic(relic);
+        relicHolder.AddRelic(RelicRegistry.GetRandom());
         relicButton.gameObject.SetActive(false);
         RealignButtons();
     }

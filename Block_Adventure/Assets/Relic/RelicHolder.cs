@@ -38,10 +38,16 @@ public class RelicHolder : MonoBehaviour
         img.preserveAspect = true;
     }
 
-    // [TEST] R 키로 글라디우스 획득. 나중에 보상 시스템에서 호출하도록 교체
+    // [TEST] 디버그 키. R = 랜덤 유물, P = 몬스터에 독 10스택
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.R))
-            AddRelic(new Relic_Gladius());
+            AddRelic(RelicRegistry.GetRandom());
+
+        if (Input.GetKeyDown(KeyCode.P))
+        {
+            var monster = GameManager.Instance?.battleManager?.currentMonster;
+            if (monster != null) monster.ApplyPoison(10);
+        }
     }
 }

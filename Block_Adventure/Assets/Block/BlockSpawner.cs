@@ -29,10 +29,24 @@ public class BlockSpawner : MonoBehaviour
     {
         if (blockDeck.Count == 0)
         {
-            GameObject[] allBlocks = Resources.LoadAll<GameObject>("Block");
-            foreach (var b in allBlocks)
-                if (b.name.StartsWith("Block_")) blockDeck.Add(b);
+            // 시작 덱: Z×2, S×2, L×2, J×2 (총 8개)
+            AddStartingBlock("Block_Z", 2);
+            AddStartingBlock("Block_S", 2);
+            AddStartingBlock("Block_L", 2);
+            AddStartingBlock("Block_J", 2);
         }
+    }
+
+    void AddStartingBlock(string prefabName, int count)
+    {
+        GameObject prefab = Resources.Load<GameObject>($"Block/{prefabName}")
+                         ?? Resources.Load<GameObject>($"RewardBlock/{prefabName}");
+        if (prefab == null)
+        {
+            Debug.LogError($"🚨 시작 덱 블록 못 찾음: {prefabName}");
+            return;
+        }
+        for (int i = 0; i < count; i++) blockDeck.Add(prefab);
     }
 
     void Start()

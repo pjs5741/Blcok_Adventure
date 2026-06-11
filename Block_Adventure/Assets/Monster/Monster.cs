@@ -8,7 +8,7 @@ public enum MonsterIntent { RowAttack, ConvertBlocks }
 public class Monster : MonoBehaviour
 {
     [Header("Base Stats")]
-    [SerializeField] protected float maxHp = 1000f;
+    [SerializeField] protected float maxHp = 5000f;
     protected float currentHp;
     protected bool isDead = false;
     protected int _poisonStacks = 0;
@@ -70,7 +70,11 @@ public class Monster : MonoBehaviour
     void SetupIntentText()
     {
         Canvas canvas = GetComponentInChildren<Canvas>();
-        if (canvas == null) return;
+        if (canvas == null)
+        {
+            Debug.LogWarning($"{gameObject.name}: 인텐트용 Canvas 자식 없음");
+            return;
+        }
 
         Transform existing = canvas.transform.Find("IntentText");
         if (existing != null) { intentText = existing.GetComponent<Text>(); return; }
@@ -79,13 +83,21 @@ public class Monster : MonoBehaviour
         textObj.transform.SetParent(canvas.transform, false);
         intentText = textObj.AddComponent<Text>();
         intentText.alignment = TextAnchor.MiddleCenter;
-        intentText.fontSize = 80;
+        intentText.fontSize = 24;
         intentText.color = Color.yellow;
-        intentText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        intentText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        intentText.verticalOverflow = VerticalWrapMode.Overflow;
+
+        Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
+                    ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+        intentText.font = font;
 
         RectTransform rt = textObj.GetComponent<RectTransform>();
-        rt.anchoredPosition = new Vector2(0, 20);
-        rt.sizeDelta = new Vector2(160, 30);
+        rt.anchorMin = new Vector2(0.5f, 0.5f);
+        rt.anchorMax = new Vector2(0.5f, 0.5f);
+        rt.pivot = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = new Vector2(0, 30);
+        rt.sizeDelta = new Vector2(200, 40);
     }
 
     public void PickIntent()
