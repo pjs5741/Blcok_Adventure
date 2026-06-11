@@ -14,21 +14,20 @@ public class BattleManager : MonoBehaviour
 
     void Start()
     {
-        GameManager.Instance.blockGrid.OnAttackTriggered += OnGridAttack;
+        GameManager.Instance.blockGrid.OnMatchCompleted += OnGridAttack;
     }
 
-    // 실제 공격 처리 함수
-    void OnGridAttack(float damageMultiplier)
+    void OnGridAttack(AttackContext ctx)
     {
-        if (currentMonster is not null && currentMonster.gameObject.activeSelf)
-        {
-            // 최종 데미지 = 기본공격력 * 배율
-            float finalDamage = player.stats.baseDamage * damageMultiplier;
-            
-            // 몬스터 때리기
-            player.Attack();
+        if (currentMonster is null || !currentMonster.gameObject.activeSelf) return;
+
+        ColorEffects.Apply(ctx, currentMonster);
+
+        player.Attack();
+
+        float finalDamage = player.stats.baseDamage * ctx.damageMultiplier;
+        if (finalDamage > 0)
             currentMonster.TakeDamage(finalDamage);
-        }
     }
     
     public bool HasLivingMonster()
@@ -59,7 +58,7 @@ public class BattleManager : MonoBehaviour
     // 게임 꺼질 때 연결 해제 (메모리 관리)
     void OnDestroy()
     {
-        if (GameManager.Instance.blockGrid != null)
-            GameManager.Instance.blockGrid.OnAttackTriggered -= OnGridAttack;
+        if (GameManager.Instance != null && GameManager.Instance.blockGrid != null)
+            GameManager.Instance.blockGrid.OnMatchCompleted -= OnGridAttack;
     }
 }

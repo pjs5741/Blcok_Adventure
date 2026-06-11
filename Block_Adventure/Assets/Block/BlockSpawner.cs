@@ -45,7 +45,8 @@ public class BlockSpawner : MonoBehaviour
                 new ColorDefinition { id = 1, color = Color.red },
                 new ColorDefinition { id = 2, color = Color.blue },
                 new ColorDefinition { id = 3, color = Color.green },
-                new ColorDefinition { id = 4, color = Color.yellow }
+                new ColorDefinition { id = 4, color = Color.yellow },
+                new ColorDefinition { id = 5, color = new Color(0.6f, 0.2f, 0.9f) }
             };
         }
 

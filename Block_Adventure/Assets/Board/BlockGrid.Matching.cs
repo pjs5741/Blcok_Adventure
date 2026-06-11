@@ -54,18 +54,34 @@ public partial class BlockGrid
                 hasEvent = true;
                 comboCount++;
 
+                AttackContext ctx = new AttackContext { comboCount = comboCount };
+
+                for (int y = 0; y < data.height; ++y)
+                    if (IsLineFull(y)) ctx.lineClearCount++;
+
+                foreach (Transform block in matchBlocks)
+                {
+                    int colorID = GetColorID(block);
+                    if (colorID <= 0) continue;
+                    if (!ctx.colorMatchCounts.ContainsKey(colorID))
+                        ctx.colorMatchCounts[colorID] = 0;
+                    ctx.colorMatchCounts[colorID]++;
+                }
+
                 if (lineBlocks.Count > 0 && matchBlocks.Count > 0)
                 {
-                    currentDamageMultiplier = 2.0f;
-                    Debug.Log($"대박! 줄+색깔 동시 폭발! (데미지 {currentDamageMultiplier}배)");
+                    ctx.isDoubleHit = true;
+                    ctx.damageMultiplier = 2.0f;
+                    Debug.Log($"대박! 줄+색깔 동시 폭발!");
                 }
                 else
                 {
-                    currentDamageMultiplier = 1.0f + (comboCount * playerStats.comboMultiplier);
+                    ctx.damageMultiplier = 1.0f + (comboCount * playerStats.comboMultiplier);
                     Debug.Log($"{comboCount}콤보! ({allToDestroy.Count}개 파괴)");
                 }
 
-                OnAttackTriggered?.Invoke(currentDamageMultiplier);
+                currentDamageMultiplier = ctx.damageMultiplier;
+                OnMatchCompleted?.Invoke(ctx);
 
                 foreach (Transform t in allToDestroy)
                 {

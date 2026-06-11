@@ -11,6 +11,7 @@ public class Monster : MonoBehaviour
     [SerializeField] protected float maxHp = 1000f;
     protected float currentHp;
     protected bool isDead = false;
+    protected int _poisonStacks = 0;
 
     [Header("보상 블록")]
     [SerializeField] protected List<GameObject> rewardPool = new List<GameObject>();
@@ -37,8 +38,33 @@ public class Monster : MonoBehaviour
     {
         currentHp = maxHp;
         isDead = false;
+        _poisonStacks = 0;
         UpdateUI();
         PickIntent();
+    }
+
+    protected virtual void OnEnable()
+    {
+        GameEvents.OnTurnEnd += TickPoison;
+    }
+
+    protected virtual void OnDisable()
+    {
+        GameEvents.OnTurnEnd -= TickPoison;
+    }
+
+    public void ApplyPoison(int stacks)
+    {
+        _poisonStacks += stacks;
+        Debug.Log($"☠ {gameObject.name} 독 {_poisonStacks}스택 누적");
+    }
+
+    void TickPoison()
+    {
+        if (isDead || _poisonStacks <= 0) return;
+        Debug.Log($"☠ 독 데미지 -{_poisonStacks} ({gameObject.name})");
+        TakeDamage(_poisonStacks);
+        _poisonStacks = Mathf.Max(0, _poisonStacks - 1);
     }
 
     void SetupIntentText()

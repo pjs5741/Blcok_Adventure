@@ -15,7 +15,7 @@ public partial class BlockGrid : MonoBehaviour
     [Header("Game Status")]
     public int comboCount = 0;
     public float currentDamageMultiplier = 1f;
-    public event Action<float> OnAttackTriggered;
+    public event Action<AttackContext> OnMatchCompleted;
 
     private PlayerStats playerStats;
 
