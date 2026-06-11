@@ -1,23 +1,27 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class RelicHolder : MonoBehaviour
 {
-    public List<Relic> relics = new List<Relic>();
     private PlayerStats stats;
     private RectTransform listPanel;
 
-    void Awake()
+    void Start()
     {
-        stats = GetComponent<Player>().stats;
+        if (!Run.IsInitialized) Run.StartNew();
+        stats = Run.stats;
+
         var found = GameObject.Find("RelicListPanel");
         if (found != null) listPanel = found.GetComponent<RectTransform>();
+
+        // 씬 재진입 시 보유한 유물 아이콘 다시 그림 (OnAcquire는 호출하지 않음)
+        foreach (var relic in Run.ownedRelics)
+            SpawnIcon(relic);
     }
 
     public void AddRelic(Relic relic)
     {
-        relics.Add(relic);
+        Run.ownedRelics.Add(relic);
         relic.OnAcquire(stats);
         SpawnIcon(relic);
         Debug.Log($"⚔ 유물 획득: {relic.Name} - {relic.Description}");

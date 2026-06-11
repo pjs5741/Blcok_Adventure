@@ -27,26 +27,21 @@ public class BlockSpawner : MonoBehaviour
 
     void Awake()
     {
-        if (blockDeck.Count == 0)
+        if (!Run.IsInitialized) Run.StartNew();
+        blockDeck.Clear();
+        foreach (string name in Run.deckBlockNames)
         {
-            // 시작 덱: Z×2, S×2, L×2, J×2 (총 8개)
-            AddStartingBlock("Block_Z", 2);
-            AddStartingBlock("Block_S", 2);
-            AddStartingBlock("Block_L", 2);
-            AddStartingBlock("Block_J", 2);
+            GameObject prefab = LoadBlock(name);
+            if (prefab != null) blockDeck.Add(prefab);
         }
     }
 
-    void AddStartingBlock(string prefabName, int count)
+    GameObject LoadBlock(string name)
     {
-        GameObject prefab = Resources.Load<GameObject>($"Block/{prefabName}")
-                         ?? Resources.Load<GameObject>($"RewardBlock/{prefabName}");
-        if (prefab == null)
-        {
-            Debug.LogError($"🚨 시작 덱 블록 못 찾음: {prefabName}");
-            return;
-        }
-        for (int i = 0; i < count; i++) blockDeck.Add(prefab);
+        GameObject prefab = Resources.Load<GameObject>($"Block/{name}")
+                         ?? Resources.Load<GameObject>($"RewardBlock/{name}");
+        if (prefab == null) Debug.LogError($"🚨 블록 못 찾음: {name}");
+        return prefab;
     }
 
     void Start()
@@ -143,6 +138,7 @@ public class BlockSpawner : MonoBehaviour
     public void AddBlockToPool(GameObject prefab)
     {
         blockDeck.Add(prefab);
+        Run.deckBlockNames.Add(prefab.name);
         // 현재 큐 랜덤 위치에 끼워넣어 곧 등장하도록
         int insertAt = Random.Range(0, _shuffleQueue.Count + 1);
         _shuffleQueue.Insert(insertAt, prefab);

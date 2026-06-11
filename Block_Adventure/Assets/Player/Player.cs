@@ -3,10 +3,16 @@ using UnityEngine;
 
 public class Player : MonoBehaviour
 {
-    public PlayerStats stats = new PlayerStats();
+    public PlayerStats stats;
 
     protected SpriteRenderer spriteRenderer;
     public Animator animator;
+
+    void Awake()
+    {
+        if (!Run.IsInitialized) Run.StartNew();
+        stats = Run.stats;
+    }
 
     void Start()
     {

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using System.Collections;
 
 public enum GameState
@@ -110,8 +111,7 @@ public class GameManager : MonoBehaviour
         if (battleManager != null && !battleManager.HasLivingMonster())
         {
             yield return StartCoroutine(RewardPhase());
-            // [TEST] 실제로는 맵 씬으로 전환 후 다음 노드 선택해야 함
-            battleManager.RespawnMonster();
+            SceneManager.LoadScene("MapScene");
         }
     }
 
