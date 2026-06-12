@@ -205,7 +205,7 @@ public class RestManager : MonoBehaviour
     void UpdateCounter()
     {
         if (counterText != null)
-            counterText.text = $"🛏 휴식 — 정리할 줄 선택 (남은: {clearsRemaining}/{maxClears})";
+            counterText.text = $"휴식 — 정리할 줄 선택 (남은: {clearsRemaining}/{maxClears})";
     }
 
     void ReturnToMap()

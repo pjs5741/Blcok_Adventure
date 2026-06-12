@@ -34,19 +34,7 @@ public class BlockSpawner : MonoBehaviour
             GameObject prefab = LoadBlock(name);
             if (prefab != null) blockDeck.Add(prefab);
         }
-    }
 
-    GameObject LoadBlock(string name)
-    {
-        GameObject prefab = Resources.Load<GameObject>($"Block/{name}")
-                         ?? Resources.Load<GameObject>($"RewardBlock/{name}");
-        if (prefab == null) Debug.LogError($"🚨 블록 못 찾음: {name}");
-        return prefab;
-    }
-
-    void Start()
-    {
-        // 시작 시 테스트용 색상 데이터가 없으면 기본값 추가 (안전장치)
         if (colorPool == null || colorPool.Count == 0)
         {
             colorPool = new List<ColorDefinition>
@@ -58,8 +46,16 @@ public class BlockSpawner : MonoBehaviour
                 new ColorDefinition { id = 5, color = new Color(0.6f, 0.2f, 0.9f) }
             };
         }
-
     }
+
+    GameObject LoadBlock(string name)
+    {
+        GameObject prefab = Resources.Load<GameObject>($"Block/{name}")
+                         ?? Resources.Load<GameObject>($"RewardBlock/{name}");
+        if (prefab == null) Debug.LogError($"🚨 블록 못 찾음: {name}");
+        return prefab;
+    }
+
 
     // (앞부분 기존과 동일, SpawnBlock 함수만 교체)
     public void SpawnBlock()

@@ -111,6 +111,16 @@ public class GameManager : MonoBehaviour
         if (battleManager != null && !battleManager.HasLivingMonster())
         {
             yield return StartCoroutine(RewardPhase());
+
+            // 보스 처치면 라운드 클리어
+            var currentNode = Run.mapState?.GetNode(Run.mapState.currentNodeId);
+            if (currentNode != null && currentNode.type == NodeType.Boss)
+            {
+                Run.lastResult = RunResult.Victory;
+                SceneManager.LoadScene("EndScene");
+                yield break;
+            }
+
             blockGrid.SaveSnapshot();
             SceneManager.LoadScene("MapScene");
         }
@@ -134,6 +144,8 @@ public class GameManager : MonoBehaviour
         StopAllCoroutines();
         CurrentState = GameState.GameOver;
         Debug.Log("GAME OVER");
+        Run.lastResult = RunResult.GameOver;
+        SceneManager.LoadScene("EndScene");
     }
 
     public void SetGameClear()

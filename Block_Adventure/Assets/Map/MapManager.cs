@@ -28,7 +28,7 @@ public class MapManager : MonoBehaviour
 
     void UpdateGoldUI()
     {
-        if (goldText != null) goldText.text = $"💰 {Run.stats.gold}";
+        if (goldText != null) goldText.text = $"골드 {Run.stats.gold}";
     }
 
     void BuildMapUI()

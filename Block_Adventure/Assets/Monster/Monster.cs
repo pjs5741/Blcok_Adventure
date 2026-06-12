@@ -9,6 +9,7 @@ public class Monster : MonoBehaviour
 {
     [Header("Base Stats")]
     [SerializeField] protected float maxHp = 5000f;
+    [SerializeField] protected int goldReward = 25;
     protected float currentHp;
     protected bool isDead = false;
     protected int _poisonStacks = 0;
@@ -134,12 +135,28 @@ public class Monster : MonoBehaviour
     protected virtual void Die()
     {
         isDead = true;
-        Debug.Log($"💀 {gameObject.name} 사망!");
+        int reward = CalculateGoldReward();
+        Debug.Log($"💀 {gameObject.name} 사망! (보상: {reward}골드)");
+
+        Run.stats.gold += reward;
 
         GameEvents.RaiseMonsterDeath();
 
         // 기본 사망 연출: 그냥 꺼지기
         gameObject.SetActive(false);
+    }
+
+    int CalculateGoldReward()
+    {
+        if (Run.mapState == null) return goldReward;
+        var node = Run.mapState.GetNode(Run.mapState.currentNodeId);
+        if (node == null) return goldReward;
+        switch (node.type)
+        {
+            case NodeType.Elite: return goldReward * 2;
+            case NodeType.Boss: return goldReward * 4;
+            default: return goldReward;
+        }
     }
 
     protected void UpdateUI()
