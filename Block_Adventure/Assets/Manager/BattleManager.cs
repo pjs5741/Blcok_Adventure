@@ -21,7 +21,7 @@ public class BattleManager : MonoBehaviour
     {
         if (currentMonster is null || !currentMonster.gameObject.activeSelf) return;
 
-        ColorEffects.Apply(ctx, currentMonster);
+        IconEffects.Apply(ctx, currentMonster);
 
         player.Attack();
 
@@ -29,7 +29,7 @@ public class BattleManager : MonoBehaviour
         if (finalDamage > 0)
             currentMonster.TakeDamage(finalDamage);
     }
-    
+
     public bool HasLivingMonster()
     {
         return currentMonster != null && currentMonster.gameObject.activeSelf;
@@ -39,6 +39,10 @@ public class BattleManager : MonoBehaviour
     {
         if (HasLivingMonster())
         {
+            // 방패로 인한 지연 — 한 턴 스킵
+            if (!currentMonster.ConsumeAttackDelay())
+                yield break;
+
             yield return new WaitUntil(() =>
                 !player.animator.GetCurrentAnimatorStateInfo(0).IsName("Player_BasicAttack"));
 

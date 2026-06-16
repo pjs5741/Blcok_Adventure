@@ -35,17 +35,14 @@ public class BlockSpawner : MonoBehaviour
             if (prefab != null) blockDeck.Add(prefab);
         }
 
-        if (colorPool == null || colorPool.Count == 0)
-        {
-            colorPool = new List<ColorDefinition>
-            {
-                new ColorDefinition { id = 1, color = Color.red },
-                new ColorDefinition { id = 2, color = Color.blue },
-                new ColorDefinition { id = 3, color = Color.green },
-                new ColorDefinition { id = 4, color = Color.yellow },
-                new ColorDefinition { id = 5, color = new Color(0.6f, 0.2f, 0.9f) }
-            };
-        }
+        // 아이콘 풀 (id 1~4) — 1:칼, 2:분노, 3:독약, 4:방패
+        // 폭탄(id 5)은 별도 1셀 블록으로만 등장
+        if (colorPool == null) colorPool = new List<ColorDefinition>();
+        colorPool.Clear();
+        colorPool.Add(new ColorDefinition { id = 1, color = new Color(0.75f, 0.75f, 0.75f) });  // 칼 — 회색
+        colorPool.Add(new ColorDefinition { id = 2, color = new Color(0.85f, 0.2f, 0.2f) });    // 분노 — 빨강
+        colorPool.Add(new ColorDefinition { id = 3, color = new Color(0.5f, 0.2f, 0.7f) });     // 독약 — 보라
+        colorPool.Add(new ColorDefinition { id = 4, color = new Color(0.2f, 0.5f, 0.85f) });    // 방패 — 파랑
     }
 
     GameObject LoadBlock(string name)
@@ -158,6 +155,7 @@ public class BlockSpawner : MonoBehaviour
     public Color GetColorByID(int id)
     {
         if (id == 99) return Color.gray;
+        if (id == 5) return new Color(0.15f, 0.15f, 0.15f); // 폭탄 — 어두운 회색 (스프라이트 도입 전 임시)
         foreach (var c in colorPool)
             if (c.id == id) return c.color;
         return Color.white;

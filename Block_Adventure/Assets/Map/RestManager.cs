@@ -217,12 +217,12 @@ public class RestManager : MonoBehaviour
     {
         switch (id)
         {
-            case 1: return Color.red;
-            case 2: return Color.blue;
-            case 3: return Color.green;
-            case 4: return Color.yellow;
-            case 5: return new Color(0.6f, 0.2f, 0.9f);
-            case 99: return Color.gray;
+            case 1: return new Color(0.75f, 0.75f, 0.75f);   // 칼
+            case 2: return new Color(0.85f, 0.2f, 0.2f);     // 분노
+            case 3: return new Color(0.5f, 0.2f, 0.7f);      // 독약
+            case 4: return new Color(0.2f, 0.5f, 0.85f);     // 방패
+            case 5: return new Color(0.15f, 0.15f, 0.15f);   // 폭탄
+            case 99: return Color.gray;                       // garbage
             default: return Color.white;
         }
     }

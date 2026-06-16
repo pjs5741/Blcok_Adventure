@@ -13,6 +13,7 @@ public class Monster : MonoBehaviour
     protected float currentHp;
     protected bool isDead = false;
     protected int _poisonStacks = 0;
+    protected int _attackDelay = 0; // 방패 효과로 누적된 공격 지연 턴 수
 
     [Header("보상 블록")]
     [SerializeField] protected List<GameObject> rewardPool = new List<GameObject>();
@@ -40,8 +41,27 @@ public class Monster : MonoBehaviour
         currentHp = maxHp;
         isDead = false;
         _poisonStacks = 0;
+        _attackDelay = 0;
         UpdateUI();
         PickIntent();
+    }
+
+    public void AddAttackDelay(int turns)
+    {
+        _attackDelay += turns;
+        Debug.Log($"🛡 {gameObject.name} 공격 {turns}턴 지연 (누적 {_attackDelay})");
+    }
+
+    // 공격 시도 전 지연 차감. true 반환 시 공격 진행, false 시 스킵.
+    public bool ConsumeAttackDelay()
+    {
+        if (_attackDelay > 0)
+        {
+            _attackDelay--;
+            Debug.Log($"🛡 {gameObject.name} 공격 지연 (남은 {_attackDelay})");
+            return false;
+        }
+        return true;
     }
 
     protected virtual void OnEnable()
