@@ -86,6 +86,13 @@ public partial class BlockGrid : MonoBehaviour
 
             if (x < 0 || x >= data.width || y < 0 || y >= data.height) continue;
             data.gridArray[x, y] = child;
+
+            // 은폐 중이면 새로 들어온 블록도 가림
+            if (IsBlind)
+            {
+                var sr = child.GetComponent<SpriteRenderer>();
+                if (sr != null) sr.enabled = false;
+            }
         }
     }
 

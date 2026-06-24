@@ -59,5 +59,13 @@ public class RelicHolder : MonoBehaviour
             var monster = GameManager.Instance?.battleManager?.currentMonster;
             if (monster != null) monster.ApplyPoison(10);
         }
+
+        //--- 2026-06-24 [TEST] B = 은폐 3턴 강제 발동 (안경 유물 없을 때만 적용됨)
+        if (Input.GetKeyDown(KeyCode.B))
+            GameManager.Instance?.blockGrid?.ApplyBlind(3);
+
+        //--- 2026-06-24 [TEST] G = 중력방향 전환(왼쪽으로 한 번 밀기) 강제 발동
+        if (Input.GetKeyDown(KeyCode.G))
+            GameManager.Instance?.blockGrid?.ApplyGravityShift();
     }
 }

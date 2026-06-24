@@ -15,6 +15,7 @@ public static class RelicRegistry
         () => new Relic_StarChain(),
         () => new Relic_Clairvoyance(),
         () => new Relic_Hold(),
+        () => new Relic_Glasses(),
     };
 
     public static Relic GetRandom() => All[UnityEngine.Random.Range(0, All.Length)]();

@@ -3,7 +3,7 @@ using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 
-public enum MonsterIntent { RowAttack, ConvertBlocks }
+public enum MonsterIntent { RowAttack, ConvertBlocks, Blind, GravityShift }
 
 public class Monster : MonoBehaviour
 {
@@ -147,6 +147,8 @@ public class Monster : MonoBehaviour
         {
             MonsterIntent.RowAttack    => "⚔ 줄 추가",
             MonsterIntent.ConvertBlocks => "☠ 블록 변환",
+            MonsterIntent.Blind         => "🌑 시야 가림",
+            MonsterIntent.GravityShift  => "⬅ 중력 전환",
             _ => ""
         };
     }
@@ -233,6 +235,12 @@ public class Monster : MonoBehaviour
                 break;
             case MonsterIntent.ConvertBlocks:
                 GameManager.Instance.blockGrid.ConvertRandomBlocksToGray(3);
+                break;
+            case MonsterIntent.Blind:
+                GameManager.Instance.blockGrid.ApplyBlind(3);
+                break;
+            case MonsterIntent.GravityShift:
+                GameManager.Instance.blockGrid.ApplyGravityShift();
                 break;
         }
 

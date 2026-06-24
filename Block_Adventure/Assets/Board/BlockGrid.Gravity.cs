@@ -24,6 +24,28 @@ public partial class BlockGrid
         }
     }
 
+    //--- 2026-06-24 [몬스터 패턴] 중력방향 전환: 각 행을 왼쪽 벽으로 압축 (가로 중력)
+    void ApplyHorizontalGravity()
+    {
+        for (int y = 0; y < data.height; y++)
+        {
+            int writeX = 0;
+            for (int x = 0; x < data.width; x++)
+            {
+                if (data.gridArray[x, y] != null)
+                {
+                    if (x != writeX)
+                    {
+                        data.gridArray[writeX, y] = data.gridArray[x, y];
+                        data.gridArray[x, y] = null;
+                        StartCoroutine(SmoothMove(data.gridArray[writeX, y], new Vector3(writeX, y, 0)));
+                    }
+                    writeX++;
+                }
+            }
+        }
+    }
+
     void ApplyBlockGravity()
     {
         int writeY = 0;
