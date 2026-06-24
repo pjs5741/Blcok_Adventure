@@ -45,7 +45,11 @@ public class Background : MonoBehaviour
                 // ī�޶� ���� �߾��� �ٶ�
                 Vector3 worldCenter = transform.parent.TransformPoint(new Vector3(centerX, centerY, cameraDepth));
                 mainCam.transform.position = new Vector3(worldCenter.x, worldCenter.y, cameraDepth);
-                mainCam.orthographicSize = (targetGrid.data.height / 2f) + padding;
+                //--- 2026-06-24 긴 변 기준으로 줌 고정 → 회전 전후 줌 안 변함(확대 X), 위치만 판 중심 따라감
+                // 기존: height만 기준 → 회전 시 height(세로) 줄면 카메라가 당겨져 확대돼버림
+                // mainCam.orthographicSize = (targetGrid.data.height / 2f) + padding;
+                float maxDim = Mathf.Max(targetGrid.data.width, targetGrid.data.height);
+                mainCam.orthographicSize = maxDim / 2f + padding;
             }
         }
     }
