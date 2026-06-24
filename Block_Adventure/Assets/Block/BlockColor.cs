@@ -2,18 +2,42 @@ using UnityEngine;
 
 public class BlockColor : MonoBehaviour
 {
-    public int colorID = 0; // 0:¹«¼Ó¼º, 1~N: »ö»ó ID
+    public int colorID = 0; // 0:ë¹„ì–´ìˆìŒ, 1~5: ì•„ì´ì½˜ ID, 99:íšŒìƒ‰ garbage
 
-    // ¿ÜºÎ(½ºÆ÷³Ê)¿¡¼­ "³Ê ÀÌ »ö±ò ÇØ!" ¶ó°í ¸í·É ³»¸®´Â ÇÔ¼ö
+    // ì˜› í˜¸í™˜
     public void SetColorInfo(int id, Color color)
+    {
+        SetIconInfo(id, color, null);
+    }
+
+    // ë°°ê²½ìƒ‰ + ì•„ì´ì½˜ ì˜¤ë²„ë ˆì´ (P&D ìŠ¤íƒ€ì¼)
+    public void SetIconInfo(int id, Color bgColor, Sprite iconSprite)
     {
         this.colorID = id;
 
-        // ³» ¸ö¶×ÀÌ(½ºÇÁ¶óÀÌÆ®) »ö±òµµ ½ÇÁ¦·Î ¹Ù²Ş
-        SpriteRenderer sr = GetComponent<SpriteRenderer>();
-        if (sr != null)
+        SpriteRenderer mainSr = GetComponent<SpriteRenderer>();
+        if (mainSr != null) mainSr.color = bgColor;
+
+        Transform iconChild = transform.Find("IconOverlay");
+
+        if (iconSprite == null)
         {
-            sr.color = color;
+            if (iconChild != null) Destroy(iconChild.gameObject);
+            return;
         }
+
+        if (iconChild == null)
+        {
+            GameObject iconGo = new GameObject("IconOverlay", typeof(SpriteRenderer));
+            iconGo.transform.SetParent(transform, false);
+            iconGo.transform.localScale = Vector3.one * 0.75f;
+            iconGo.transform.localPosition = new Vector3(0, 0, -0.01f); // ì‚´ì§ ì•ìœ¼ë¡œ
+            iconChild = iconGo.transform;
+        }
+
+        SpriteRenderer iconSr = iconChild.GetComponent<SpriteRenderer>();
+        iconSr.sprite = iconSprite;
+        iconSr.color = Color.white;
+        if (mainSr != null) iconSr.sortingOrder = mainSr.sortingOrder + 1;
     }
 }

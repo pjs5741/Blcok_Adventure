@@ -27,6 +27,9 @@ public class BlockMovement : MonoBehaviour
 
         // 2. 바닥 착지 (이제 myGrid가 확실히 있음)
         SnapToFloor();
+
+        // 3. 아이콘은 처음부터 똑바로
+        KeepChildrenUpright();
     }
 
     void Update()
@@ -43,6 +46,7 @@ public class BlockMovement : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.A)) RotateBlock(90);
         else if (Input.GetKeyDown(KeyCode.S)) RotateBlock(-90);
         else if (Input.GetKeyDown(KeyCode.Space)) LockBlock();
+        else if (Input.GetKeyDown(KeyCode.C)) { mySpawner.HoldCurrent(); return; }  // 홀드 유물 (없으면 내부에서 무시)
     }
 
     // --- (이 아래는 기존 함수들 그대로 유지) ---
@@ -74,6 +78,14 @@ public class BlockMovement : MonoBehaviour
             transform.Rotate(0, 0, -angle);
             SnapToFloor();
         }
+        KeepChildrenUpright();
+    }
+
+    // 부모 회전과 무관하게 각 셀(아이콘)은 똑바로
+    void KeepChildrenUpright()
+    {
+        foreach (Transform child in transform)
+            child.rotation = Quaternion.identity;
     }
 
     void LockBlock()

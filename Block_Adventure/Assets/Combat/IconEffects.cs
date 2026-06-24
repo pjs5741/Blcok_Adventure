@@ -16,6 +16,10 @@ public static class IconEffects
         if (ctx.poisonStacks > 0)
             target.ApplyPoison(ctx.poisonStacks);
 
+        // 화상 스택 적용
+        if (ctx.burnStacks > 0)
+            target.ApplyBurn(ctx.burnStacks);
+
         // 방패 딜레이 적용 — 10개당 1턴
         int delayTurns = ctx.shieldCleared / 10;
         if (delayTurns > 0)

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Linq;
 
 public class RelicHolder : MonoBehaviour
 {
@@ -35,7 +36,7 @@ public class RelicHolder : MonoBehaviour
         iconGO.transform.SetParent(listPanel, false);
 
         RectTransform rt = iconGO.GetComponent<RectTransform>();
-        rt.sizeDelta = new Vector2(80, 80);
+        rt.sizeDelta = new Vector2(56, 56);
 
         Image img = iconGO.GetComponent<Image>();
         img.sprite = relic.GetIcon();
@@ -45,8 +46,13 @@ public class RelicHolder : MonoBehaviour
     // [TEST] 디버그 키. R = 랜덤 유물, P = 몬스터에 독 10스택
     void Update()
     {
+        //--- 2026-06-23 [TEST] R = 천리안+홀드 강제 지급 (미리보기/홀드 테스트용). 기존: 랜덤 유물
+        // if (Input.GetKeyDown(KeyCode.R)) AddRelic(RelicRegistry.GetRandom());
         if (Input.GetKeyDown(KeyCode.R))
-            AddRelic(RelicRegistry.GetRandom());
+        {
+            if (!Run.ownedRelics.Any(r => r is Relic_Clairvoyance)) AddRelic(new Relic_Clairvoyance());
+            if (!Run.ownedRelics.Any(r => r is Relic_Hold)) AddRelic(new Relic_Hold());
+        }
 
         if (Input.GetKeyDown(KeyCode.P))
         {

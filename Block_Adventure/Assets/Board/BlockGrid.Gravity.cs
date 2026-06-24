@@ -59,6 +59,20 @@ public partial class BlockGrid
         return true;
     }
 
+    //--- 2026-06-23 줄클리어 가능 줄: 꽉 찼고 + 회색(99)이 아닌 블록이 1개 이상.
+    // 컬러가 하나라도 섞인 꽉 찬 줄은 회색까지 통째로 제거(테트리스 성립).
+    // 회색으로만 꽉 찬 줄은 제외 — 중력으로 우연히 모인 것이므로 공짜로 안 터짐 (폭탄/회복실로만).
+    bool IsLineClearable(int y)
+    {
+        bool hasNonGray = false;
+        for (int x = 0; x < data.width; x++)
+        {
+            if (data.gridArray[x, y] == null) return false;
+            if (GetColorID(data.gridArray[x, y]) != 99) hasNonGray = true;
+        }
+        return hasNonGray;
+    }
+
     bool IsLineEmpty(int y)
     {
         for (int x = 0; x < data.width; x++)

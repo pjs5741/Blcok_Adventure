@@ -20,6 +20,7 @@ public class RewardManager : MonoBehaviour
 
     private bool _isProceeded;
     private RelicHolder relicHolder;
+    private Relic _pendingRelic;   // 이번 보상에서 줄 유물 (엘리트/보스에서만, 중복 제외하고 미리 뽑음)
 
     void Awake()
     {
@@ -66,8 +67,13 @@ public class RewardManager : MonoBehaviour
         for (int i = 0; i < rewardCards.Length; i++)
             rewardCards[i].Setup(pool[Random.Range(0, pool.Length)]);
 
+        //--- 2026-06-23 유물은 엘리트/보스 노드에서만, 종류당 1개(중복 제외). 다 모았으면 버튼 X
+        var node = Run.mapState?.GetNode(Run.mapState.currentNodeId);
+        bool relicNode = node != null && (node.type == NodeType.Elite || node.type == NodeType.Boss);
+        _pendingRelic = relicNode ? RelicRegistry.GetRandomExcluding(Run.ownedRelics) : null;
+
         blockCardButton.gameObject.SetActive(true);
-        relicButton.gameObject.SetActive(true);
+        relicButton.gameObject.SetActive(_pendingRelic != null);
         skipButton.gameObject.SetActive(true);
         RealignButtons();
 
@@ -98,7 +104,9 @@ public class RewardManager : MonoBehaviour
 
     public void ClickRelicButton()
     {
-        relicHolder.AddRelic(RelicRegistry.GetRandom());
+        if (_pendingRelic == null) return;
+        relicHolder.AddRelic(_pendingRelic);
+        _pendingRelic = null;
         relicButton.gameObject.SetActive(false);
         RealignButtons();
     }

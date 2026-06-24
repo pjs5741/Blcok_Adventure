@@ -13,6 +13,7 @@ public class Monster : MonoBehaviour
     protected float currentHp;
     protected bool isDead = false;
     protected int _poisonStacks = 0;
+    protected int _burnStacks = 0;
     protected int _attackDelay = 0; // 방패 효과로 누적된 공격 지연 턴 수
 
     [Header("보상 블록")]
@@ -41,6 +42,7 @@ public class Monster : MonoBehaviour
         currentHp = maxHp;
         isDead = false;
         _poisonStacks = 0;
+        _burnStacks = 0;
         _attackDelay = 0;
         UpdateUI();
         PickIntent();
@@ -67,11 +69,13 @@ public class Monster : MonoBehaviour
     protected virtual void OnEnable()
     {
         GameEvents.OnTurnEnd += TickPoison;
+        GameEvents.OnTurnStart += TickBurn;
     }
 
     protected virtual void OnDisable()
     {
         GameEvents.OnTurnEnd -= TickPoison;
+        GameEvents.OnTurnStart -= TickBurn;
     }
 
     public void ApplyPoison(int stacks)
@@ -80,12 +84,26 @@ public class Monster : MonoBehaviour
         Debug.Log($"☠ {gameObject.name} 독 {_poisonStacks}스택 누적");
     }
 
+    public void ApplyBurn(int stacks)
+    {
+        _burnStacks += stacks;
+        Debug.Log($"🔥 {gameObject.name} 화상 {_burnStacks}스택 누적");
+    }
+
     void TickPoison()
     {
         if (isDead || _poisonStacks <= 0) return;
         Debug.Log($"☠ 독 데미지 -{_poisonStacks} ({gameObject.name})");
         TakeDamage(_poisonStacks);
         _poisonStacks = Mathf.Max(0, _poisonStacks - 1);
+    }
+
+    void TickBurn()
+    {
+        if (isDead || _burnStacks <= 0) return;
+        Debug.Log($"🔥 화상 데미지 -{_burnStacks} ({gameObject.name})");
+        TakeDamage(_burnStacks);
+        _burnStacks = Mathf.Max(0, _burnStacks - 1);
     }
 
     void SetupIntentText()

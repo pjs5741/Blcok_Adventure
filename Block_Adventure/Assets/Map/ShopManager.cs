@@ -51,8 +51,9 @@ public class ShopManager : MonoBehaviour
             for (int i = 0; i < cardCount; i++)
                 cardOffers.Add(blockPool[Random.Range(0, blockPool.Length)]);
 
-        for (int i = 0; i < relicCount; i++)
-            relicOffers.Add(RelicRegistry.GetRandom());
+        //--- 2026-06-23 유물은 엘리트 몹에서만 획득. 상점에서는 유물 판매 안 함
+        // for (int i = 0; i < relicCount; i++)
+        //     relicOffers.Add(RelicRegistry.GetRandom());
     }
 
     void BuildUI()
