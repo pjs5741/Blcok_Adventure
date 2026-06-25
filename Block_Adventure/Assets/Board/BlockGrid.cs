@@ -84,7 +84,9 @@ public partial class BlockGrid : MonoBehaviour
             int x = Mathf.RoundToInt(child.position.x);
             int y = Mathf.RoundToInt(child.position.y);
 
-            if (x < 0 || x >= data.width || y < 0 || y >= data.height) continue;
+            if (x < 0 || x >= data.width || y < 0) continue;
+            //--- 2026-06-25 테트리스식 게임오버: 블록이 그리드 천장 위(height 이상)로 넘쳐 락되면 오버플로
+            if (y >= data.height) { _overflowed = true; continue; }
             data.gridArray[x, y] = child;
 
             // 은폐 중이면 새로 들어온 블록도 가림
@@ -96,15 +98,12 @@ public partial class BlockGrid : MonoBehaviour
         }
     }
 
-    public bool IsGameOver()
-    {
-        for (int x = 0; x < data.width; x++)
-        {
-            if (data.gridArray[x, data.height - 1] != null)
-                return true;
-        }
-        return false;
-    }
+    private bool _overflowed = false;
+
+    //--- 2026-06-25 테트리스식: 블록이 그리드 밖(천장 위)으로 넘쳐 락됐을 때만 게임오버
+    // 기존: 맨 윗줄(height-1)에 블록 닿으면 게임오버 → 너무 빡빡해서 변경
+    // public bool IsGameOver() { for (int x=0; x<data.width; x++) if (data.gridArray[x, data.height-1] != null) return true; return false; }
+    public bool IsGameOver() => _overflowed;
 
     public bool IsValidIndex(int x, int y)
     {

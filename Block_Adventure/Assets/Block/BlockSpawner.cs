@@ -177,6 +177,9 @@ public class BlockSpawner : MonoBehaviour
     Vector3 PreviewTop => new Vector3(-3.5f, myGrid.data.height - 4f, 0);                 // 다음 블록(그리드 왼쪽 바깥)
     Vector3 HoldPos    => new Vector3(myGrid.data.width + 1.5f, myGrid.data.height - 4f, 0); // 홀드(그리드 오른쪽 위)
 
+    // 외부(피벗 등 그리드 변형)에서 미리보기/홀드 표시를 강제 갱신
+    public void RefreshVisuals() { RefreshPreviewUI(); RefreshHoldUI(); }
+
     // [천리안] 다음 블록 PREVIEW_AHEAD개를 그리드 왼쪽에 미니 + 액자로 표시
     void RefreshPreviewUI()
     {

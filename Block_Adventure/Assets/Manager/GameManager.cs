@@ -70,6 +70,10 @@ public class GameManager : MonoBehaviour
         _isPlayerInputDone = false;
 
         GameEvents.RaiseTurnStart();
+
+        // 피벗/중력전환 등 그리드 변형 연출이 진행 중이면 끝날 때까지 스폰 대기 (연출 중 스폰하면 위치/크기 불일치 버그)
+        yield return new WaitUntil(() => blockGrid == null || !blockGrid.IsBusy);
+
         spawner.SpawnBlock();
 
         yield return new WaitUntil(() => _isPlayerInputDone);

@@ -64,9 +64,11 @@ public class RelicHolder : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.B))
             GameManager.Instance?.blockGrid?.ApplyBlind(3);
 
-        //--- 2026-06-24 [TEST] G = 중력방향 전환(왼쪽으로 한 번 밀기) 강제 발동
+        //--- 2026-06-24 [TEST] G = 중력 왼쪽, H = 중력 오른쪽 강제 발동
         if (Input.GetKeyDown(KeyCode.G))
-            GameManager.Instance?.blockGrid?.ApplyGravityShift();
+            GameManager.Instance?.blockGrid?.ApplyGravityShift(true);
+        if (Input.GetKeyDown(KeyCode.H))
+            GameManager.Instance?.blockGrid?.ApplyGravityShift(false);
 
         //--- 2026-06-24 [TEST] V = 피벗(판 90도 회전, 3턴 후 원복) 강제 발동
         if (Input.GetKeyDown(KeyCode.V))
