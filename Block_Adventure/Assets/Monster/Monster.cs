@@ -11,6 +11,10 @@ public class Monster : MonoBehaviour
     [SerializeField] protected float maxHp = 5000f;
     [SerializeField] protected int goldReward = 25;
     protected float currentHp;
+    protected MonsterIntent[] _intentPool;        // 이 몹이 쓰는 패턴 풀 (프로필에서 주입, 가중치는 중복으로)
+    protected Color _baseColor = Color.white;     // 외형 기본색 (피격 연출 후 복귀용)
+    protected bool _hitting = false;              // 피격 연출 중 (독 펄스보다 우선)
+    static readonly Color PoisonColor = new Color(0.6f, 0.2f, 0.85f);   // 독 상태 보라색
     protected bool isDead = false;
     protected int _poisonStacks = 0;
     protected int _burnStacks = 0;
@@ -34,7 +38,27 @@ public class Monster : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
         SetupIntentText();
+        ApplyNodeProfile();   // 현재 노드 타입에 맞는 몬스터 프로필 적용 (HP/색/패턴풀)
         Init();
+    }
+
+    //--- 2026-06-25 노드별 몬스터 배정: 현재 노드 타입에 맞는 프로필을 골라 적용
+    void ApplyNodeProfile()
+    {
+        var node = Run.mapState?.GetNode(Run.mapState.currentNodeId);
+        NodeType type = node != null ? node.type : NodeType.Battle;
+        SetProfile(MonsterRegistry.GetForNode(type));
+    }
+
+    public void SetProfile(MonsterProfile p)
+    {
+        if (p == null) return;
+        maxHp = p.maxHp;
+        goldReward = p.goldReward;
+        _intentPool = p.intentPool;
+        _baseColor = p.tint;
+        if (spriteRenderer != null) spriteRenderer.color = _baseColor;
+        if (!string.IsNullOrEmpty(p.name)) gameObject.name = p.name;
     }
 
     public virtual void Init()
@@ -46,6 +70,21 @@ public class Monster : MonoBehaviour
         _attackDelay = 0;
         UpdateUI();
         PickIntent();
+    }
+
+    //--- 2026-06-26 독 걸린 동안 보라색으로 반짝(펄스). 피격 중(_hitting)엔 양보.
+    protected virtual void Update()
+    {
+        if (isDead || _hitting || spriteRenderer == null) return;
+        if (_poisonStacks > 0)
+        {
+            float t = (Mathf.Sin(Time.time * 6f) + 1f) * 0.5f;   // 0~1 펄스
+            spriteRenderer.color = Color.Lerp(_baseColor, PoisonColor, t * 0.7f);
+        }
+        else
+        {
+            spriteRenderer.color = _baseColor;
+        }
     }
 
     public void AddAttackDelay(int turns)
@@ -141,7 +180,10 @@ public class Monster : MonoBehaviour
 
     public void PickIntent()
     {
-        CurrentIntent = (MonsterIntent)Random.Range(0, System.Enum.GetValues(typeof(MonsterIntent)).Length);
+        if (_intentPool != null && _intentPool.Length > 0)
+            CurrentIntent = _intentPool[Random.Range(0, _intentPool.Length)];
+        else
+            CurrentIntent = MonsterIntent.RowAttack;   // 풀 미설정 시 기본
         if (intentText == null) return;
         intentText.text = CurrentIntent switch
         {
@@ -214,9 +256,11 @@ public class Monster : MonoBehaviour
     {
         if (spriteRenderer != null)
         {
+            _hitting = true;
             spriteRenderer.color = Color.red;
             yield return new WaitForSeconds(0.1f);
-            spriteRenderer.color = Color.white;
+            spriteRenderer.color = _baseColor;
+            _hitting = false;
         }
     }
     
