@@ -4,6 +4,10 @@ using System.Collections.Generic;
 
 public partial class BlockGrid
 {
+    //--- 2026-06-29 금 블럭(보물): 깨질 때 골드 지급. 회색(99)과 달리 줄 클리어 가능(non-gray 취급), 색매칭 X, 데미지 X.
+    public const int GoldBlockID = 98;
+    public const int GoldBlockValue = 6;   // 금 블럭 1개당 골드
+
     public void ConvertRandomBlocksToGray(int count)
     {
         var candidates = new List<Vector2Int>();
@@ -12,7 +16,7 @@ public partial class BlockGrid
                 if (data.gridArray[x, y] != null)
                 {
                     BlockColor bc = data.gridArray[x, y].GetComponent<BlockColor>();
-                    if (bc != null && bc.colorID != 99)
+                    if (bc != null && bc.colorID != 99 && bc.colorID != GoldBlockID)   // 회색·금 블럭은 변환 대상 제외
                         candidates.Add(new Vector2Int(x, y));
                 }
 
@@ -31,17 +35,17 @@ public partial class BlockGrid
         }
     }
 
-    // 멀티줄 보너스 배율
+    // 멀티줄 보너스 배율 (블록 수는 줄마다 이미 늘어나므로 배율은 과하지 않게. 1줄도 0.3→1.0로 정상 데미지)
     static float GetLineMultiplier(int lineCount)
     {
         switch (lineCount)
         {
             case 0: return 0f;
-            case 1: return 0.3f;
-            case 2: return 0.6f;
-            case 3: return 1.1f;
-            case 4: return 1.6f;
-            default: return 2.0f; // 5줄 이상
+            case 1: return 1.0f;
+            case 2: return 1.2f;
+            case 3: return 1.5f;
+            case 4: return 2.0f;
+            default: return 2.5f; // 5줄 이상
         }
     }
 
@@ -101,7 +105,7 @@ public partial class BlockGrid
                 ctx.lineMultiplier = GetLineMultiplier(ctx.lineClearCount);
                 ctx.isDoubleHit = (lineBlocks.Count > 0 && matchBlocks.Count > 0);
 
-                float perBlock = playerStats.baseDamage / playerStats.matchThreshold;
+                float perBlock = playerStats.EffectiveDamage / playerStats.matchThreshold;   //--- 2026-07-01 공격 버프 포함
                 float comboMult = 1.0f + comboCount * playerStats.comboMultiplier;
 
                 int shieldFromColor = 0, shieldFromLine = 0;
@@ -141,6 +145,7 @@ public partial class BlockGrid
                         case 3: poisonFromLine++; break;
                         case 4: shieldFromLine++; break;
                         case 5: /* 폭탄 */ break;
+                        case GoldBlockID: break;   // 금 블럭: 데미지 X (골드는 파괴 시 지급)
                         default: lineBlockDamage += perBlock; break;
                     }
                 }
@@ -161,18 +166,18 @@ public partial class BlockGrid
 
                 //--- 2026-06-23 유물 조건부 배율 (미보유 시 ×1 → 무영향)
                 if (comboCount >= 4) totalBaseDamage *= playerStats.chainComboBonus;        // 성좌의 사슬
-                if (GetFillRatio() >= 0.6f) totalBaseDamage *= playerStats.glassHeartBonus; // 유리 심장
+                if (GetFillRatio() >= Tuning.GlassHeartFillThreshold) totalBaseDamage *= playerStats.glassHeartBonus; // 유리 심장
 
-                ctx.damageMultiplier = totalBaseDamage / Mathf.Max(playerStats.baseDamage, 1f);
+                ctx.damageMultiplier = totalBaseDamage / Mathf.Max(playerStats.EffectiveDamage, 1f);
                 currentDamageMultiplier = ctx.damageMultiplier;
 
                 Debug.Log($"{comboCount}콤보 | 줄{ctx.lineClearCount}({ctx.lineMultiplier:F1}배) | 색매칭 {matchBlocks.Count}개 | 합 데미지 ~{totalBaseDamage:F0} | 방패 {totalShield} 독 {totalPoison} 화상 {totalBurn}");
 
-                OnMatchCompleted?.Invoke(ctx);
-
                 foreach (Transform t in allToDestroy)
                 {
                     if (t == null) continue;
+
+                    if (GetColorID(t) == GoldBlockID) Run.stats.gold += GoldBlockValue;   // 금 블럭 파괴 → 골드
 
                     int tx = Mathf.RoundToInt(t.position.x);
                     int ty = Mathf.RoundToInt(t.position.y);
@@ -182,8 +187,12 @@ public partial class BlockGrid
                     StartCoroutine(AnimateAndDestroy(t));
                 }
 
-                if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(0.2f, 0.3f);
+                if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(Tuning.BlockDestroyShakeStrength, Tuning.BlockDestroyShakeDuration);
                 yield return new WaitForSeconds(destroyDuration + 0.05f);
+
+                //--- 2026-06-30 블록 깨진 뒤 공격: 플레이어 공격/몬스터 피격 모션이 "끝날 때까지" 대기(고정 시간 X) → 그 다음 중력
+                var battle = GameManager.Instance != null ? GameManager.Instance.battleManager : null;
+                if (battle != null) yield return StartCoroutine(battle.AttackRoutine(ctx));
 
                 if (matchBlocks.Count > 0)
                     ApplyGravity();
@@ -231,6 +240,7 @@ public partial class BlockGrid
             foreach (Transform t in toDestroy)
             {
                 if (t == null) continue;
+                if (GetColorID(t) == GoldBlockID) Run.stats.gold += GoldBlockValue;   // 금 블럭 폭탄 파괴 → 골드
                 int tx = Mathf.RoundToInt(t.position.x);
                 int ty = Mathf.RoundToInt(t.position.y);
                 if (IsValidIndex(tx, ty) && data.gridArray[tx, ty] == t)
@@ -238,7 +248,7 @@ public partial class BlockGrid
                 StartCoroutine(AnimateAndDestroy(t));
             }
 
-            if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(0.2f, 0.3f);
+            if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(Tuning.BlockDestroyShakeStrength, Tuning.BlockDestroyShakeDuration);
             yield return new WaitForSeconds(destroyDuration + 0.05f);
 
             // 폭탄 폭발은 중력 미적용 — 터진 자리는 빈칸으로 유지 (줄 클리어와 동일 정책)
@@ -285,7 +295,7 @@ public partial class BlockGrid
                 if (data.gridArray[x, y] == null || visited[x, y]) continue;
 
                 int startColor = GetColorID(data.gridArray[x, y]);
-                if (startColor == 0 || startColor == 99) continue;
+                if (startColor == 0 || startColor == 99 || startColor == GoldBlockID) continue;   // 금 블럭은 색매칭 X
 
                 List<Transform> currentGroup = new List<Transform>();
                 Queue<Vector2Int> queue = new Queue<Vector2Int>();

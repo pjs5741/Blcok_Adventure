@@ -11,11 +11,14 @@ public partial class BlockGrid : MonoBehaviour
     [Header("Animation Settings")]
     public float dropDuration = 0.2f;
     public float destroyDuration = 0.3f;
+    //--- 2026-06-30 고정 대기(attackAnimDuration) 폐기 → 실제 모션 완료 대기(BattleManager.AttackRoutine)로 대체
+    // public float attackAnimDuration = 0.45f;
 
     [Header("Game Status")]
     public int comboCount = 0;
     public float currentDamageMultiplier = 1f;
-    public event Action<AttackContext> OnMatchCompleted;
+    //--- 2026-06-30 OnMatchCompleted 이벤트 폐기 → BlockGrid가 BattleManager.AttackRoutine 직접 호출(모션 완료 대기)
+    // public event Action<AttackContext> OnMatchCompleted;
 
     private PlayerStats playerStats;
 
@@ -23,7 +26,13 @@ public partial class BlockGrid : MonoBehaviour
     {
         data = new GridData(11, 21);
         spawner = FindFirstObjectByType<BlockSpawner>();
-        playerStats = FindFirstObjectByType<Player>().stats;
+        //--- 2026-07-01 Player 미배치 시 크래시 방지 (없으면 기본 스탯으로 폴백)
+        var player = FindFirstObjectByType<Player>();
+        playerStats = player != null ? player.stats : (Run.IsInitialized ? Run.stats : new PlayerStats());
+
+        //--- 2026-06-30 블록 호버 툴팁 부착 (마우스 올린 칸의 색/효과 표시)
+        var hover = GetComponent<BlockHoverTooltip>() ?? gameObject.AddComponent<BlockHoverTooltip>();
+        hover.grid = this;
     }
 
     void Start()
@@ -42,6 +51,21 @@ public partial class BlockGrid : MonoBehaviour
                     snap[x, y] = bc != null ? bc.colorID : 0;
                 }
         Run.gridSnapshot = snap;
+    }
+
+    //--- 2026-07-01 협동: 그리드 색을 1차원(row-major, [x + y*width]) 배열로 평탄화 — 상대 미니뷰 전송용
+    public int[] FlattenColors()
+    {
+        int[] flat = new int[data.width * data.height];
+        for (int y = 0; y < data.height; y++)
+            for (int x = 0; x < data.width; x++)
+            {
+                var cell = data.gridArray[x, y];
+                if (cell == null) continue;
+                var bc = cell.GetComponent<BlockColor>();
+                flat[x + y * data.width] = bc != null ? bc.colorID : 0;
+            }
+        return flat;
     }
 
     public void LoadSnapshot()

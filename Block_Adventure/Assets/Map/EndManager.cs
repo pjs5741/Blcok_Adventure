@@ -6,6 +6,8 @@ public class EndManager : MonoBehaviour
 {
     void Start()
     {
+        //--- 2026-07-01 런 종료(승/패) → 세이브 삭제(끝난 런을 이어하기로 부활시키지 않음)
+        SaveSystem.Delete();
         SetupCanvas();
     }
 
@@ -26,7 +28,7 @@ public class EndManager : MonoBehaviour
         {
             CreateText(canvas, "Stats",
                 new Vector2(0.2f, 0.35f), new Vector2(0.8f, 0.55f),
-                $"보유 골드: {Run.stats.gold}\n보유 유물: {(Run.ownedRelics?.Count ?? 0)}개\n덱 블록 수: {(Run.deckBlockNames?.Count ?? 0)}",
+                $"보유 골드: {Run.stats.gold}\n보유 유물: {(Run.ownedRelics?.Count ?? 0)}개\n덱 블록 수: {(Run.deck?.Count ?? 0)}",
                 50, Color.white);
         }
 
@@ -59,7 +61,7 @@ public class EndManager : MonoBehaviour
         t.fontSize = fontSize;
         t.alignment = TextAnchor.MiddleCenter;
         t.color = color;
-        t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        t.font = UIFont.Regular;
         return t;
     }
 
@@ -88,6 +90,6 @@ public class EndManager : MonoBehaviour
         t.fontSize = 50;
         t.alignment = TextAnchor.MiddleCenter;
         t.color = Color.white;
-        t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        t.font = UIFont.Regular;
     }
 }

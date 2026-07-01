@@ -13,11 +13,16 @@ public class RestManager : MonoBehaviour
     private Text counterText;
     private RectTransform rowButtonContainer;
     private RectTransform gridDisplay;
+    private Transform _canvas;
+    private int _cardRemoveLeft = 1;   //--- 2026-06-30 휴식 1회 무료 카드 제거
 
     void Start()
     {
         if (!Run.IsInitialized) Run.StartNew();
+        //--- 2026-07-01 스냅샷이 있으면 그 실제 차원을 따름(피벗으로 스왑된 경우 대비). 없으면 기본 생성.
         if (Run.gridSnapshot == null) Run.gridSnapshot = new int[gridWidth, gridHeight];
+        gridWidth = Run.gridSnapshot.GetLength(0);
+        gridHeight = Run.gridSnapshot.GetLength(1);
 
         clearsRemaining = maxClears;
 
@@ -36,45 +41,29 @@ public class RestManager : MonoBehaviour
         rowButtonContainer = FindOrCreateRect(canvas, "RowButtons", new Vector2(0.6f, 0.05f), new Vector2(0.95f, 0.9f));
 
         CreateDoneButton(canvas);
+
+        //--- 2026-06-30 카드 제거 버튼 (1회 무료)
+        _canvas = canvas;
+        if (canvas.Find("RemoveCardBtn") == null)
+        {
+            var removeBtn = UIBuilder.Button(canvas, "RemoveCardBtn", "카드 제거 (1회)", 30, OpenDeckEdit, new Color(0.45f, 0.3f, 0.5f));
+            UIBuilder.SetAnchors((RectTransform)removeBtn.transform, new Vector2(0.02f, 0.92f), new Vector2(0.24f, 0.99f));
+        }
     }
 
-    RectTransform FindOrCreateRect(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax)
+    void OpenDeckEdit()
     {
-        Transform existing = parent.Find(name);
-        if (existing != null) return existing.GetComponent<RectTransform>();
-
-        GameObject go = new GameObject(name, typeof(RectTransform));
-        go.layer = LayerMask.NameToLayer("UI");
-        go.transform.SetParent(parent, false);
-        RectTransform rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = anchorMin;
-        rt.anchorMax = anchorMax;
-        rt.anchoredPosition = Vector2.zero;
-        rt.sizeDelta = Vector2.zero;
-        return rt;
+        var go = new GameObject("DeckEdit");
+        var panel = go.AddComponent<DeckEditPanel>();
+        panel.Open(_canvas, _cardRemoveLeft, 0, () => _cardRemoveLeft--);
     }
+
+    //--- 2026-06-30 공용 UIBuilder로 위임(중복 제거)
+    RectTransform FindOrCreateRect(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax)
+        => UIBuilder.FindOrCreateRect(parent, name, anchorMin, anchorMax);
 
     Text FindOrCreateText(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, int fontSize, TextAnchor align)
-    {
-        Transform existing = parent.Find(name);
-        if (existing != null) return existing.GetComponent<Text>();
-
-        GameObject go = new GameObject(name, typeof(RectTransform), typeof(Text));
-        go.layer = LayerMask.NameToLayer("UI");
-        go.transform.SetParent(parent, false);
-        RectTransform rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = anchorMin;
-        rt.anchorMax = anchorMax;
-        rt.anchoredPosition = Vector2.zero;
-        rt.sizeDelta = Vector2.zero;
-
-        Text t = go.GetComponent<Text>();
-        t.fontSize = fontSize;
-        t.alignment = align;
-        t.color = Color.white;
-        t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        return t;
-    }
+        => UIBuilder.FindOrCreateText(parent, name, anchorMin, anchorMax, fontSize, align);
 
     void CreateDoneButton(Transform parent)
     {
@@ -108,7 +97,7 @@ public class RestManager : MonoBehaviour
         lt.alignment = TextAnchor.MiddleCenter;
         lt.fontSize = 40;
         lt.color = Color.white;
-        lt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        lt.font = UIFont.Regular;
     }
 
     void BuildUI()
@@ -189,7 +178,7 @@ public class RestManager : MonoBehaviour
             lt.alignment = TextAnchor.MiddleCenter;
             lt.fontSize = 24;
             lt.color = Color.white;
-            lt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            lt.font = UIFont.Regular;
         }
     }
 
@@ -222,6 +211,7 @@ public class RestManager : MonoBehaviour
             case 3: return new Color(0.5f, 0.2f, 0.7f);      // 독약
             case 4: return new Color(0.2f, 0.5f, 0.85f);     // 방패
             case 5: return new Color(0.15f, 0.15f, 0.15f);   // 폭탄
+            case 98: return new Color(1f, 0.84f, 0f);        // 금 블럭(보물)
             case 99: return Color.gray;                       // garbage
             default: return Color.white;
         }

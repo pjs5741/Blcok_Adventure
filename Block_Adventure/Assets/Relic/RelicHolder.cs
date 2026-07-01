@@ -41,6 +41,11 @@ public class RelicHolder : MonoBehaviour
         Image img = iconGO.GetComponent<Image>();
         img.sprite = relic.GetIcon();
         img.preserveAspect = true;
+
+        //--- 2026-06-29 호버 툴팁: 유물 이름 + 설명
+        var tip = iconGO.AddComponent<TooltipTarget>();
+        tip.title = relic.Name;
+        tip.body = relic.Description;
     }
 
     // [TEST] 디버그 키. R = 랜덤 유물, P = 몬스터에 독 10스택
@@ -70,8 +75,12 @@ public class RelicHolder : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.H))
             GameManager.Instance?.blockGrid?.ApplyGravityShift(false);
 
-        //--- 2026-06-24 [TEST] V = 피벗(판 90도 회전, 3턴 후 원복) 강제 발동
+        //--- 2026-06-29 [TEST] V = 몬스터의 다음 인텐트를 '판 회전'으로 지정 → 정상 몬스터 공격 턴에 발동(즉시 X, 타이밍 버그 방지)
+        // 기존: ApplyPivot(3) 즉시 호출 → 플레이어 턴 중(블록 떠있을 때)에도 발동돼 미추적 셀 등 문제
         if (Input.GetKeyDown(KeyCode.V))
-            GameManager.Instance?.blockGrid?.ApplyPivot(3);
+        {
+            var monster = GameManager.Instance?.battleManager?.currentMonster;
+            if (monster != null) monster.ForceNextIntent(MonsterIntent.Pivot);
+        }
     }
 }

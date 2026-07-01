@@ -59,13 +59,14 @@ public class RewardManager : MonoBehaviour
     {
         _isProceeded = false;
 
-        var monsterPool = monster?.GetRewardPool();
-        var pool = (monsterPool != null && monsterPool.Count > 0)
-            ? monsterPool.ToArray()
-            : rewardBlockPrefabs;
-
+        //--- 2026-06-30 카드마다 모양(몬스터별 가중치 독립추첨) + 색(효과)을 함께 확정. 색은 카드에 고정되어 덱에 들어감.
+        var shapes = monster != null ? monster.RewardShapes : null;
         for (int i = 0; i < rewardCards.Length; i++)
-            rewardCards[i].Setup(pool[Random.Range(0, pool.Length)]);
+        {
+            GameObject prefab = RollShape(shapes);
+            int colorID = Random.Range(BlockColors.MinEffect, BlockColors.MaxEffect + 1);
+            if (prefab != null) rewardCards[i].Setup(prefab, colorID);
+        }
 
         //--- 2026-06-23 유물은 엘리트/보스 노드에서만, 종류당 1개(중복 제외). 다 모았으면 버튼 X
         var node = Run.mapState?.GetNode(Run.mapState.currentNodeId);
@@ -87,9 +88,38 @@ public class RewardManager : MonoBehaviour
         gameObject.SetActive(false);
     }
 
-    public void OnCardSelected(GameObject blockPrefab)
+    //--- 2026-06-30 모양 가중 추첨(카드 1장 = 1회 독립시행). 가중치 없거나 로드 실패 시 기본 풀로 폴백.
+    GameObject RollShape(ShapeDrop[] shapes)
     {
-        GameManager.Instance.spawner.AddBlockToPool(blockPrefab);
+        if (shapes != null && shapes.Length > 0)
+        {
+            float total = 0f;
+            foreach (var s in shapes) total += s.weight;
+            float r = Random.value * total;
+            foreach (var s in shapes)
+            {
+                r -= s.weight;
+                if (r <= 0f)
+                {
+                    var p = LoadShape(s.shape);
+                    if (p != null) return p;   // 로드 실패(예: 미생성 프리팹)면 폴백으로
+                    break;
+                }
+            }
+        }
+        if (rewardBlockPrefabs != null && rewardBlockPrefabs.Length > 0)
+            return rewardBlockPrefabs[Random.Range(0, rewardBlockPrefabs.Length)];
+        return null;
+    }
+
+    static GameObject LoadShape(string name)
+        => Resources.Load<GameObject>($"Block/{name}") ?? Resources.Load<GameObject>($"RewardBlock/{name}");
+
+    public void OnCardSelected(GameObject blockPrefab, int colorID)
+    {
+        //--- 2026-07-01 널 가드 (씬 전환/미배치 시 크래시 방지)
+        if (GameManager.Instance != null && GameManager.Instance.spawner != null)
+            GameManager.Instance.spawner.AddBlockToPool(blockPrefab, colorID);
         cardSelectPanel.SetActive(false);
         blockCardButton.gameObject.SetActive(false);
         RealignButtons();
@@ -105,6 +135,8 @@ public class RewardManager : MonoBehaviour
     public void ClickRelicButton()
     {
         if (_pendingRelic == null) return;
+        if (relicHolder == null) relicHolder = FindFirstObjectByType<RelicHolder>();
+        if (relicHolder == null) return;   //--- 2026-07-01 널 가드
         relicHolder.AddRelic(_pendingRelic);
         _pendingRelic = null;
         relicButton.gameObject.SetActive(false);

@@ -172,6 +172,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   blockNameText: {fileID: 0}
+  rotateInterval: 1
+  artYOffset: 1.7
 --- !u!114 &114284804
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -307,6 +309,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   blockNameText: {fileID: 0}
+  rotateInterval: 1
+  artYOffset: 1.7
 --- !u!114 &263805580
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1392,7 +1396,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: -10, y: 0, z: 0}
-  m_LocalScale: {x: 10, y: 10, z: 10}
+  m_LocalScale: {x: 6, y: 6, z: 6}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1413,7 +1417,13 @@ MonoBehaviour:
     baseDamage: 100
     comboMultiplier: 0.1
     matchThreshold: 15
+    gold: 0
+    chainComboBonus: 1
+    glassHeartBonus: 1
   animator: {fileID: 0}
+  dodgeOffset: {x: -2.5, y: 0}
+  dodgeHeight: 1.5
+  dodgeDuration: 0.6
 --- !u!114 &1209864166
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1693,6 +1703,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   blockNameText: {fileID: 0}
+  rotateInterval: 1
+  artYOffset: 1.7
 --- !u!114 &1448238919
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1881,6 +1893,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   currentMonster: {fileID: 1716615815}
   player: {fileID: 0}
+  monsterTelegraph: 0.55
+  playerAttackState: Player_BasicAttack
 --- !u!4 &1526340401
 Transform:
   m_ObjectHideFlags: 0
@@ -2044,6 +2058,7 @@ MonoBehaviour:
   destroyDuration: 0.3
   comboCount: 0
   currentDamageMultiplier: 1
+  pivotDuration: 0.4
 --- !u!1 &1716615814
 GameObject:
   m_ObjectHideFlags: 0
@@ -2076,8 +2091,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHp: 100
+  goldReward: 25
   rewardPool: []
   hpSlider: {fileID: 722817092}
+  attackStateName: Basic_Attack
 --- !u!4 &1716615816
 Transform:
   m_ObjectHideFlags: 0
@@ -2088,7 +2105,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: -1, z: 0, w: 0}
   m_LocalPosition: {x: 23, y: 0, z: 0}
-  m_LocalScale: {x: 10, y: 10, z: 1}
+  m_LocalScale: {x: 6, y: 6, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1339313377}
@@ -2989,7 +3006,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a8133612807063f4fa819e15a19775a5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  blockDeck: []
   basicBlockPrefab: {fileID: 1815897115179152931, guid: f2ae71eb3cfe46047a12404b2a11f3e2, type: 3}
   colorPool: []
   myGrid: {fileID: 1658435051}

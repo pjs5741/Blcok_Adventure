@@ -132,38 +132,48 @@ public partial class BlockGrid
         }
     }
 
-    [Header("Pivot")]
-    public float pivotDuration = 0.4f;
+    //--- 2026-07-01 씬 직렬화 값(0.4)이 Tuning 기본값(0.6)을 덮어쓰던 문제 → Tuning 파생으로 고정(직렬화 무시)
+    private float pivotDuration => Tuning.PivotDuration;   // 판 90도 회전 시간
 
-    // 전체 블록을 임시 부모에 묶어 부모를 90도 회전(+중심 이동) 보간, 카메라도 동시에. 끝나면 데이터 회전 확정.
+    // 전체 블록을 임시 부모(모서리축)에 묶어 90도 회전 보간 + 카메라가 판을 따라감. 끝나면 데이터 회전 확정 후 새 중심으로 재정렬.
     IEnumerator PivotRoutine(bool ccw)
     {
         _pivotAnimating = true;
-        float oldCx = (data.width - 1) / 2f, oldCy = (data.height - 1) / 2f;
+
+        //--- 2026-06-26 단순·확실 버전: 고정점 회전(미끄러짐/재정렬 +20 없이 제자리서 90도 돌아 원점 안착)
+        // + 카메라는 시작↔끝 프레임 부드러운 보간 + 액터는 회전 후 보드 폭 기준 간격으로 이동.
+        // (이전 "왼쪽 쿵 + 카메라 호 추적 + 재정렬" 방식은 액터 휩쓸림/타이밍 충돌로 폐기)
+        float pc = (ccw ? data.height - 1 : data.width - 1) / 2f;   // 고정점: 슬라이드 없이 새 격자에 정확히 안착
+        Vector3 pivot = new Vector3(pc, pc, 0);
+
+        //--- [회피] 판 회전 동안 플레이어 뒤로 물러남 / 복귀
+        var player = FindFirstObjectByType<Player>();
+        if (player != null) { if (ccw) player.Dodge(); else player.DodgeReturn(); }
+
+        //--- 2026-06-29 액터 간격 이동을 회전과 동시에 (회전 후가 아니라) → "판에 합쳐졌다 물러남" 2단계 제거.
+        // 회전 후 보드 폭 = 현재 data.height(스왑됨). 왼쪽(플레이어)은 안 움직이고, 가로판서 오른쪽(몬스터)만 비켜남.
+        int newWidth = data.height;
+        foreach (var a in FindObjectsByType<PivotActor>(FindObjectsSortMode.None)) a.MoveToGap(pivotDuration, newWidth);
 
         GameObject root = new GameObject("PivotRoot");
-        root.transform.position = new Vector3(oldCx, oldCy, 0);
+        root.transform.position = pivot;
         for (int x = 0; x < data.width; x++)
             for (int y = 0; y < data.height; y++)
                 if (data.gridArray[x, y] != null) data.gridArray[x, y].SetParent(root.transform);
 
-        // 배경도 같이 회전시키려고 임시로 root에 묶음 (끝나면 복원)
+        // 배경도 같이 회전 (끝나면 복원)
         var bgComp = FindFirstObjectByType<Background>();
         Transform bgT = bgComp != null ? bgComp.transform : null;
         Transform bgParent = bgT != null ? bgT.parent : null;
         if (bgT != null) bgT.SetParent(root.transform);
 
-        // 회전 후(width/height 스왑) 새 판 중심
-        int newW = data.height, newH = data.width;
-        float newCx = (newW - 1) / 2f, newCy = (newH - 1) / 2f;
-
-        Vector3 sPos = root.transform.position, ePos = new Vector3(newCx, newCy, 0);
         float eAng = ccw ? 90f : -90f;
 
-        // 카메라는 놔둔다 — 회전 전 위치/줌을 기억했다가 끝에 그대로 복원
+        // 카메라: 현재 → 회전 후 그리드 중심(width/height 스왑)으로 부드럽게 보간
         Camera cam = Camera.main;
-        Vector3 camKeep = cam != null ? cam.transform.position : Vector3.zero;
-        float camSizeKeep = cam != null ? cam.orthographicSize : 0f;
+        Vector3 camStart = cam != null ? cam.transform.position : Vector3.zero;
+        float camZ = camStart.z;
+        Vector3 camEnd = new Vector3((data.height - 1) / 2f, (data.width - 1) / 2f, camZ);
 
         float t = 0f;
         while (t < 1f)
@@ -171,11 +181,11 @@ public partial class BlockGrid
             t += Time.deltaTime / Mathf.Max(pivotDuration, 0.01f);
             float e = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t));
             root.transform.rotation = Quaternion.Euler(0, 0, Mathf.Lerp(0f, eAng, e));
-            root.transform.position = Vector3.Lerp(sPos, ePos, e);
+            if (cam != null) cam.transform.position = Vector3.Lerp(camStart, camEnd, e);
             yield return null;
         }
 
-        // 데이터 회전 확정 + 블록을 정수 좌표로 snap
+        // 데이터 회전 확정 + 블록 정수좌표 snap (고정점 회전이라 이미 데이터 위치)
         RotateGridData(ccw);
         for (int x = 0; x < data.width; x++)
             for (int y = 0; y < data.height; y++)
@@ -187,19 +197,17 @@ public partial class BlockGrid
                 c.rotation = Quaternion.identity;
             }
 
-        // 배경 복원 (회전 풀고 원래 부모로) → Destroy(root) 전에 빼야 같이 파괴 안 됨
+        // 배경 복원 후 root 파괴
         if (bgT != null) { bgT.SetParent(bgParent); bgT.rotation = Quaternion.identity; }
         Destroy(root);
 
-        //--- 2026-06-25 회전된 배치 그대로 유지 (중력 적용 안 함). 게임오버가 테트리스식(밖 넘침)이라 천장 닿아도 안전
+        //--- 2026-06-25 회전 배치 유지 (중력 적용 안 함)
         // ApplyGravity();
 
+        // 배경/카메라 최종 정렬 (camEnd와 동일 위치라 점프 없음)
         if (bgComp != null) bgComp.ResizeAndReposition();
 
-        // 카메라는 놔둠 — ResizeAndReposition이 옮긴 걸 회전 전 상태로 되돌림
-        if (cam != null) { cam.transform.position = camKeep; cam.orthographicSize = camSizeKeep; }
-
-        // 회전으로 그리드 크기가 바뀌었으니 미리보기/홀드(고스트블럭) 위치 갱신
+        // 미리보기/홀드 갱신
         if (spawner != null) spawner.RefreshVisuals();
 
         _pivotAnimating = false;

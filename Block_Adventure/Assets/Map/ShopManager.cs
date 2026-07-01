@@ -10,10 +10,14 @@ public class ShopManager : MonoBehaviour
     public int relicCount = 2;
     public int cardPrice = 50;
     public int relicPrice = 100;
+    public int removePrice = 75;   //--- 2026-06-30 카드 제거 비용(장당)
+
+    private Transform _canvas;
 
     private Text goldText;
     private Transform itemContainer;
     private List<GameObject> cardOffers = new List<GameObject>();
+    private List<int> cardColorIDs = new List<int>();   //--- 2026-06-29 카드별 색(효과) — 색 고정 덱빌딩
     private List<Relic> relicOffers = new List<Relic>();
     private List<GameObject> cardSlots = new List<GameObject>();
     private List<GameObject> relicSlots = new List<GameObject>();
@@ -42,6 +46,21 @@ public class ShopManager : MonoBehaviour
         itemContainer = FindOrCreateRect(canvas, "ItemContainer", new Vector2(0.1f, 0.15f), new Vector2(0.9f, 0.85f));
 
         CreateLeaveButton(canvas);
+
+        //--- 2026-06-30 카드 제거 버튼 (장당 골드)
+        _canvas = canvas;
+        if (canvas.Find("RemoveCardBtn") == null)
+        {
+            var removeBtn = UIBuilder.Button(canvas, "RemoveCardBtn", $"카드 제거 ({removePrice}골드)", 30, OpenDeckEdit, new Color(0.45f, 0.3f, 0.5f));
+            UIBuilder.SetAnchors((RectTransform)removeBtn.transform, new Vector2(0.02f, 0.92f), new Vector2(0.26f, 0.99f));
+        }
+    }
+
+    void OpenDeckEdit()
+    {
+        var go = new GameObject("DeckEdit");
+        var panel = go.AddComponent<DeckEditPanel>();
+        panel.Open(_canvas, 0, removePrice, UpdateGoldUI);   // 골드 비용 방식
     }
 
     void GenerateOffers()
@@ -49,7 +68,10 @@ public class ShopManager : MonoBehaviour
         var blockPool = Resources.LoadAll<GameObject>("RewardBlock");
         if (blockPool.Length > 0)
             for (int i = 0; i < cardCount; i++)
+            {
                 cardOffers.Add(blockPool[Random.Range(0, blockPool.Length)]);
+                cardColorIDs.Add(Random.Range(BlockColors.MinEffect, BlockColors.MaxEffect + 1));
+            }
 
         //--- 2026-06-23 유물은 엘리트 몹에서만 획득. 상점에서는 유물 판매 안 함
         // for (int i = 0; i < relicCount; i++)
@@ -72,7 +94,7 @@ public class ShopManager : MonoBehaviour
         {
             int captured = i;
             GameObject slot = CreateItemSlot(idx * slotW, (idx + 1) * slotW,
-                cardOffers[i] != null ? cardOffers[i].name : "(판매됨)",
+                cardOffers[i] != null ? $"{cardOffers[i].name}\n[{BlockColors.Name(cardColorIDs[i])}]" : "(판매됨)",
                 cardOffers[i] != null ? cardPrice : 0,
                 cardOffers[i] != null,
                 () => BuyCard(captured),
@@ -144,8 +166,8 @@ public class ShopManager : MonoBehaviour
         if (Run.stats.gold < cardPrice) return;
 
         Run.stats.gold -= cardPrice;
-        Run.deckBlockNames.Add(cardOffers[index].name);
-        Debug.Log($"카드 구매: {cardOffers[index].name} (-{cardPrice}골드)");
+        Run.deck.Add(new DeckEntry(cardOffers[index].name, cardColorIDs[index]));
+        Debug.Log($"카드 구매: {cardOffers[index].name} [{BlockColors.Name(cardColorIDs[index])}] (-{cardPrice}골드)");
         cardOffers[index] = null;
         BuildUI();
     }
@@ -185,57 +207,13 @@ public class ShopManager : MonoBehaviour
         if (goldText != null) goldText.text = $"골드 {Run.stats.gold}";
     }
 
+    //--- 2026-06-30 공용 UIBuilder로 위임(중복 제거)
     RectTransform FindOrCreateRect(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax)
-    {
-        Transform existing = parent.Find(name);
-        if (existing != null) return existing.GetComponent<RectTransform>();
-        GameObject go = new GameObject(name, typeof(RectTransform));
-        go.layer = LayerMask.NameToLayer("UI");
-        go.transform.SetParent(parent, false);
-        RectTransform rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = anchorMin;
-        rt.anchorMax = anchorMax;
-        rt.anchoredPosition = Vector2.zero;
-        rt.sizeDelta = Vector2.zero;
-        return rt;
-    }
+        => UIBuilder.FindOrCreateRect(parent, name, anchorMin, anchorMax);
 
     Text FindOrCreateText(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, int fontSize, TextAnchor align)
-    {
-        Transform existing = parent.Find(name);
-        if (existing != null) return existing.GetComponent<Text>();
-        GameObject go = new GameObject(name, typeof(RectTransform), typeof(Text));
-        go.layer = LayerMask.NameToLayer("UI");
-        go.transform.SetParent(parent, false);
-        RectTransform rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = anchorMin;
-        rt.anchorMax = anchorMax;
-        rt.anchoredPosition = Vector2.zero;
-        rt.sizeDelta = Vector2.zero;
-        Text t = go.GetComponent<Text>();
-        t.fontSize = fontSize;
-        t.alignment = align;
-        t.color = Color.white;
-        t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        return t;
-    }
+        => UIBuilder.FindOrCreateText(parent, name, anchorMin, anchorMax, fontSize, align);
 
     Text CreateChildText(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax, string text, int fontSize, Color color)
-    {
-        GameObject go = new GameObject(name, typeof(RectTransform), typeof(Text));
-        go.layer = LayerMask.NameToLayer("UI");
-        go.transform.SetParent(parent, false);
-        RectTransform rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = anchorMin;
-        rt.anchorMax = anchorMax;
-        rt.anchoredPosition = Vector2.zero;
-        rt.sizeDelta = Vector2.zero;
-        Text t = go.GetComponent<Text>();
-        t.text = text;
-        t.fontSize = fontSize;
-        t.alignment = TextAnchor.MiddleCenter;
-        t.color = color;
-        t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        return t;
-    }
+        => UIBuilder.ChildText(parent, name, anchorMin, anchorMax, text, fontSize, color);
 }

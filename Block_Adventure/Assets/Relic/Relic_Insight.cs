@@ -21,6 +21,8 @@ public class Relic_Insight : Relic
         GameEvents.OnTurnEnd -= HandleTurnEnd;
     }
 
+    public override void OnLoad(PlayerStats stats) => OnAcquire(stats);   //--- 2026-07-01 로드 시 재구독(스탯 변경 없음)
+
     void HandleTurnEnd()
     {
         if (_stats.matchThreshold > MinThreshold)

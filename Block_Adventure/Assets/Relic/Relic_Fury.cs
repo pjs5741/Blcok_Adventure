@@ -19,9 +19,12 @@ public class Relic_Fury : Relic
         GameEvents.OnTurnStart -= HandleTurnStart;
     }
 
+    public override void OnLoad(PlayerStats stats) => OnAcquire(stats);   //--- 2026-07-01 로드 시 재구독(스탯 변경 없음)
+
     void HandleTurnStart()
     {
-        _stats.baseDamage += 5;
-        Debug.Log($"⚔ 분노 발동 → 공격력 {_stats.baseDamage}");
+        //--- 2026-07-01 baseDamage 영구 누적 → 전투 단위 버프(buffAttack)로. 디스펠로 제거 가능 + 버프 표시.
+        _stats.buffAttack += 5;
+        Debug.Log($"⚔ 분노 발동 → 공격 버프 +{_stats.buffAttack}");
     }
 }

@@ -4,34 +4,55 @@ using UnityEngine;
 // HP/보상 수치는 임시 — 밸런스는 나중에 조정.
 public static class MonsterRegistry
 {
+    //--- 2026-06-30 보상 모양 드랍 가중치 (보상 카드마다 독립 추첨). 1자(Block_I)가 등급 높은 모양.
+    static ShapeDrop[] NormalShapes => new[] {
+        new ShapeDrop("Block_I", 30), new ShapeDrop("Block_L", 18), new ShapeDrop("Block_J", 18),
+        new ShapeDrop("Block_S", 14), new ShapeDrop("Block_Z", 14), new ShapeDrop("Block_T", 6),
+    };
+    static ShapeDrop[] EliteShapes => new[] {
+        new ShapeDrop("Block_I", 80), new ShapeDrop("Block_L", 5), new ShapeDrop("Block_J", 5),
+        new ShapeDrop("Block_T", 5), new ShapeDrop("Block_Square", 5),
+    };
+    static ShapeDrop[] BossShapes => new[] {
+        new ShapeDrop("Block_I", 38), new ShapeDrop("Block_X", 16), new ShapeDrop("Block_Plus", 16),
+        new ShapeDrop("Block_T", 12), new ShapeDrop("Block_Square", 10), new ShapeDrop("Block_L", 8),
+    };
+
     static MonsterProfile[] Normal() => new[]
     {
         new MonsterProfile {
-            name = "슬라임", maxHp = 3000, goldReward = 20, tint = new Color(0.5f, 0.85f, 0.5f),
-            intentPool = new[] { MonsterIntent.RowAttack }   // 입문용: 줄추가만
+            name = "슬라임", maxHp = 300, goldReward = 20, tint = new Color(0.5f, 0.85f, 0.5f),
+            intentPool = new[] { MonsterIntent.RowAttack },   // 입문용: 줄추가만
+            rewardShapes = NormalShapes
         },
         new MonsterProfile {
-            name = "좀비", maxHp = 4500, goldReward = 25, tint = new Color(0.6f, 0.4f, 0.7f),
+            name = "좀비", maxHp = 500, goldReward = 25, tint = new Color(0.6f, 0.4f, 0.7f),
             intentPool = new[] { MonsterIntent.RowAttack, MonsterIntent.RowAttack,
-                                 MonsterIntent.ConvertBlocks, MonsterIntent.Blind }
+                                 MonsterIntent.ConvertBlocks, MonsterIntent.Blind,
+                                 MonsterIntent.SelfCleanse },   // 독/화상 빌드 견제
+            rewardShapes = NormalShapes
         },
     };
 
     static MonsterProfile[] Elite() => new[]
     {
         new MonsterProfile {
-            name = "골렘", maxHp = 8000, goldReward = 50, tint = new Color(0.6f, 0.6f, 0.65f),
+            name = "골렘", maxHp = 900, goldReward = 50, tint = new Color(0.6f, 0.6f, 0.65f),
             intentPool = new[] { MonsterIntent.RowAttack, MonsterIntent.RowAttack,
-                                 MonsterIntent.GravityShift, MonsterIntent.GravityShiftRight }
+                                 MonsterIntent.GravityShift, MonsterIntent.GravityShiftRight,
+                                 MonsterIntent.Dispel, MonsterIntent.SelfCleanse },   // 버프 견제
+            rewardShapes = EliteShapes
         },
     };
 
     static MonsterProfile[] Boss() => new[]
     {
         new MonsterProfile {
-            name = "보스", maxHp = 15000, goldReward = 100, tint = new Color(0.9f, 0.3f, 0.3f),
+            name = "보스", maxHp = 1600, goldReward = 100, tint = new Color(0.9f, 0.3f, 0.3f),
             intentPool = new[] { MonsterIntent.RowAttack, MonsterIntent.RowAttack,
-                                 MonsterIntent.Pivot, MonsterIntent.ConvertBlocks }
+                                 MonsterIntent.Pivot, MonsterIntent.ConvertBlocks,
+                                 MonsterIntent.Dispel },   // 플레이어 버프 견제
+            rewardShapes = BossShapes
         },
     };
 

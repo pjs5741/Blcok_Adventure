@@ -5,7 +5,8 @@ using System.Linq;
 public class BlockSpawner : MonoBehaviour
 {
     [Header("Block Deck (모양)")]
-    public List<GameObject> blockDeck = new List<GameObject>();
+    //--- 2026-06-29 색 고정 덱빌딩으로 전환되며 미사용. 덱은 _deck(모양+색)으로 관리.
+    // public List<GameObject> blockDeck = new List<GameObject>();
     public GameObject basicBlockPrefab;
 
     [Header("Color Pool (색상)")]
@@ -15,7 +16,10 @@ public class BlockSpawner : MonoBehaviour
     [Header("References")]
     public BlockGrid myGrid;
 
-    private List<GameObject> _shuffleQueue = new List<GameObject>();
+    //--- 2026-06-29 덱이 (모양+색) 카드 단위로 셔플됨. 색은 고정(스폰 시 랜덤색 폐기).
+    private struct DeckCard { public GameObject prefab; public int colorID; }
+    private List<DeckCard> _deck = new List<DeckCard>();         // 셔플백 원본
+    private List<DeckCard> _shuffleQueue = new List<DeckCard>(); // 현재 셔플 큐
 
     //--- 2026-06-23 미리보기 큐: 모양+색을 미리 확정해 둠 (천리안/홀드 유물 전제).
     // 색 랜덤성은 유지(결정 시점만 당겨짐). buffer[0] = 다음에 스폰될 블록.
@@ -39,21 +43,13 @@ public class BlockSpawner : MonoBehaviour
     void Awake()
     {
         if (!Run.IsInitialized) Run.StartNew();
-        blockDeck.Clear();
-        foreach (string name in Run.deckBlockNames)
+        //--- 2026-06-29 덱을 (모양+색)으로 로드. 색은 카드에 고정되어 있음(스폰 시 랜덤 X). 색값은 BlockColors 단일 소스.
+        _deck.Clear();
+        foreach (var entry in Run.deck)
         {
-            GameObject prefab = LoadBlock(name);
-            if (prefab != null) blockDeck.Add(prefab);
+            GameObject prefab = LoadBlock(entry.blockName);
+            if (prefab != null) _deck.Add(new DeckCard { prefab = prefab, colorID = entry.colorID });
         }
-
-        // 아이콘 풀 (id 1~5) — 1:칼, 2:분노, 3:독약, 4:방패, 5:폭탄
-        if (colorPool == null) colorPool = new List<ColorDefinition>();
-        colorPool.Clear();
-        colorPool.Add(new ColorDefinition { id = 1, color = new Color(0.95f, 0.95f, 0.95f) });  // 칼 — 흰색 (garbage 회색과 구분)
-        colorPool.Add(new ColorDefinition { id = 2, color = new Color(0.85f, 0.2f, 0.2f) });    // 분노 — 빨강
-        colorPool.Add(new ColorDefinition { id = 3, color = new Color(0.5f, 0.2f, 0.7f) });     // 독약 — 보라
-        colorPool.Add(new ColorDefinition { id = 4, color = new Color(0.2f, 0.5f, 0.85f) });    // 방패 — 파랑
-        colorPool.Add(new ColorDefinition { id = 5, color = new Color(0.3f, 0.2f, 0.1f) });     // 폭탄 — 어두운 갈색
     }
 
     GameObject LoadBlock(string name)
@@ -68,7 +64,7 @@ public class BlockSpawner : MonoBehaviour
     // 턴 시작 시 호출 — 미리보기 버퍼에서 다음 블록을 꺼내 스폰
     public void SpawnBlock()
     {
-        if (blockDeck.Count == 0)
+        if (_deck.Count == 0)
         {
             Debug.LogError("🚨 블록 덱이 비어있습니다!");
             return;
@@ -85,15 +81,14 @@ public class BlockSpawner : MonoBehaviour
     // 미리보기 버퍼를 최소 (현재 1 + 미리보기 PREVIEW_AHEAD)개로 채움. 모양은 셔플백, 색은 랜덤으로 미리 확정.
     void EnsureBuffer()
     {
+        if (_deck.Count == 0) return;   // 덱 비면 중단 (무한루프 방지)
         while (_previewBuffer.Count < PREVIEW_AHEAD + 1)
         {
             if (_shuffleQueue.Count == 0) RefillQueue();
-            GameObject prefab = _shuffleQueue[0];
+            DeckCard card = _shuffleQueue[0];
             _shuffleQueue.RemoveAt(0);
-            ColorDefinition cd = colorPool.Count > 0
-                ? colorPool[Random.Range(0, colorPool.Count)]
-                : new ColorDefinition { id = 1, color = Color.white };
-            _previewBuffer.Add(new NextBlock { prefab = prefab, colorID = cd.id, color = cd.color });
+            // 색은 카드에 고정 — 더 이상 랜덤 X
+            _previewBuffer.Add(new NextBlock { prefab = card.prefab, colorID = card.colorID, color = BlockColors.Get(card.colorID) });
         }
     }
 
@@ -169,13 +164,15 @@ public class BlockSpawner : MonoBehaviour
     private List<GameObject> _holdVisuals = new List<GameObject>();
     private static Sprite _boxSprite;
 
-    // 미니 블록 표시 좌표 — 그리드 크기 기준 상대 위치 (Play 보며 오프셋만 조정)
-    private const float PreviewGapY = 5f;   // 미리보기 세로 간격
-    private const float MiniScale = 0.7f;
-    private static readonly Vector3 FrameOffset = new Vector3(0.8f, 0.4f, 0); // 액자 중심(블록이 우상단으로 펼쳐지므로 보정)
-    private static readonly Vector2 FrameSize = new Vector2(4.2f, 4.2f);      // 액자 크기
-    Vector3 PreviewTop => new Vector3(-3.5f, myGrid.data.height - 4f, 0);                 // 다음 블록(그리드 왼쪽 바깥)
-    Vector3 HoldPos    => new Vector3(myGrid.data.width + 1.5f, myGrid.data.height - 4f, 0); // 홀드(그리드 오른쪽 위)
+    //--- 2026-07-01 미리보기/홀드: 상수는 Tuning 단일 소스로 정리(스케일/간격만). 배치는 사용자 요구대로 고정.
+    //  항상 미리보기=판 왼쪽 바깥, 홀드=판 오른쪽. y는 고정(PreviewY), x만 보드 폭 따라 변함. (판 뒤집혀도 위/아래로 안 감)
+    private float MiniScale => Tuning.PreviewMiniScale;
+    private float FrameSize => Tuning.PreviewFrameSize;
+    private float PreviewStepDist => FrameSize + Tuning.PreviewFrameGap;      // 프레임 사이 간격(겹침 방지)
+
+    Vector3 PreviewBase => new Vector3(-3.2f, Tuning.PreviewY, 0f);                     // 판 왼쪽 바깥(x 고정, y 고정)
+    Vector3 PreviewStep => Vector3.down * PreviewStepDist;                              // 아래로 스택
+    Vector3 HoldPos     => new Vector3(myGrid.data.width + 2.2f, Tuning.PreviewY, 0f);  // 판 오른쪽(x만 폭 따라, y 고정)
 
     // 외부(피벗 등 그리드 변형)에서 미리보기/홀드 표시를 강제 갱신
     public void RefreshVisuals() { RefreshPreviewUI(); RefreshHoldUI(); }
@@ -190,7 +187,7 @@ public class BlockSpawner : MonoBehaviour
         var nexts = PeekNext(PREVIEW_AHEAD);
         for (int i = 0; i < nexts.Count; i++)
         {
-            Vector3 pos = PreviewTop + Vector3.down * (PreviewGapY * i);
+            Vector3 pos = PreviewBase + PreviewStep * i;
             _previewVisuals.Add(MakeFrame(pos));
             _previewVisuals.Add(MakeMiniVisual(nexts[i], pos));
         }
@@ -210,8 +207,8 @@ public class BlockSpawner : MonoBehaviour
     GameObject MakeFrame(Vector3 pos)
     {
         GameObject f = new GameObject("MiniFrame", typeof(SpriteRenderer));
-        f.transform.position = pos + FrameOffset;
-        f.transform.localScale = new Vector3(FrameSize.x, FrameSize.y, 1f);
+        f.transform.position = pos;
+        f.transform.localScale = new Vector3(FrameSize, FrameSize, 1f);
         var sr = f.GetComponent<SpriteRenderer>();
         sr.sprite = GetBoxSprite();
         sr.color = new Color(0.08f, 0.08f, 0.12f, 0.7f);
@@ -226,6 +223,12 @@ public class BlockSpawner : MonoBehaviour
         g.transform.localScale = Vector3.one * MiniScale;
         if (g.TryGetComponent(out BlockMovement m)) Destroy(m);
 
+        // 셀 평균 위치만큼 보정해 액자 중앙에 정렬 (모양마다 펼침 방향이 달라서)
+        Vector3 childCenter = Vector3.zero; int n = 0;
+        foreach (Transform child in g.transform) { childCenter += child.localPosition; n++; }
+        if (n > 0) childCenter /= n;
+        g.transform.position = pos - childCenter * MiniScale;
+
         foreach (var sr in g.GetComponentsInChildren<SpriteRenderer>())
         {
             BlockColor bc = sr.GetComponent<BlockColor>();
@@ -234,6 +237,11 @@ public class BlockSpawner : MonoBehaviour
             Color c = sr.color; c.a = 1f; sr.color = c;
             sr.sortingOrder = 0;
         }
+
+        // 호버 툴팁 (색/효과)
+        var tip = g.AddComponent<WorldHoverTooltip>();
+        tip.title = BlockColors.Name(nb.colorID);
+        tip.body = BlockColors.Desc(nb.colorID);
         return g;
     }
 
@@ -285,7 +293,7 @@ public class BlockSpawner : MonoBehaviour
     
     void RefillQueue()
     {
-        _shuffleQueue = new List<GameObject>(blockDeck);
+        _shuffleQueue = new List<DeckCard>(_deck);
         for (int i = _shuffleQueue.Count - 1; i > 0; i--)
         {
             int j = Random.Range(0, i + 1);
@@ -293,18 +301,36 @@ public class BlockSpawner : MonoBehaviour
         }
     }
 
-    public void AddBlockToPool(GameObject prefab)
+    public void AddBlockToPool(GameObject prefab, int colorID)
     {
-        blockDeck.Add(prefab);
-        Run.deckBlockNames.Add(prefab.name);
+        DeckCard card = new DeckCard { prefab = prefab, colorID = colorID };
+        _deck.Add(card);
+        Run.deck.Add(new DeckEntry(prefab.name, colorID));
         // 현재 큐 랜덤 위치에 끼워넣어 곧 등장하도록
         int insertAt = Random.Range(0, _shuffleQueue.Count + 1);
-        _shuffleQueue.Insert(insertAt, prefab);
+        _shuffleQueue.Insert(insertAt, card);
     }
 
     public void RemoveBlockFromPool(GameObject prefab)
     {
-        blockDeck.Remove(prefab);
+        int i = _deck.FindIndex(c => c.prefab == prefab);
+        if (i >= 0) _deck.RemoveAt(i);
+    }
+
+    //--- 2026-06-30 덱 뷰어용: 전체 덱 / 남은 드로우 더미(셔플큐+미리보기) 조회
+    public List<(string shape, int color)> GetDeckAll()
+    {
+        var list = new List<(string, int)>();
+        foreach (var c in _deck) if (c.prefab != null) list.Add((c.prefab.name, c.colorID));
+        return list;
+    }
+
+    public List<(string shape, int color)> GetDrawPile()
+    {
+        var list = new List<(string, int)>();
+        foreach (var c in _shuffleQueue) if (c.prefab != null) list.Add((c.prefab.name, c.colorID));
+        foreach (var nb in _previewBuffer) if (nb.prefab != null) list.Add((nb.prefab.name, nb.colorID));
+        return list;
     }
 
     public void AddColorToPool(int id, Color color)
@@ -317,14 +343,7 @@ public class BlockSpawner : MonoBehaviour
         colorPool.RemoveAll(c => c.id == id);
     }
 
-    public Color GetColorByID(int id)
-    {
-        if (id == 99) return Color.gray;
-        // if (id == 5) return new Color(0.15f, 0.15f, 0.15f); // 폭탄 임시색 (이제 풀의 갈색 사용)
-        foreach (var c in colorPool)
-            if (c.id == id) return c.color;
-        return Color.white;
-    }
+    public Color GetColorByID(int id) => BlockColors.Get(id);   //--- 2026-06-29 단일 소스로 위임
     
     
 }

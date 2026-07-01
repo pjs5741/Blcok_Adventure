@@ -19,6 +19,8 @@ public class Relic_GuardianHand : Relic
         GameEvents.OnTurnStart -= HandleTurnStart;
     }
 
+    public override void OnLoad(PlayerStats stats) => OnAcquire(stats);   //--- 2026-07-01 로드 시 재구독(스탯 변경 없음)
+
     void HandleTurnStart()
     {
         _turnCounter++;
