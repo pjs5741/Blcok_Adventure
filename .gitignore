@@ -76,3 +76,7 @@ out/
 target/
 .gradle/
 build/
+
+# 2026-07-06 WebGL 서빙 빌드는 예외(다른 PC가 pull해서 서빙해야 하므로 추적)
+!block-adventure-web/src/main/resources/static/Build/
+!block-adventure-web/src/main/resources/static/Build/**
