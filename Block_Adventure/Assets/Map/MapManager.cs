@@ -11,6 +11,7 @@ public class MapManager : MonoBehaviour
     void Start()
     {
         if (!Run.IsInitialized) Run.StartNew();
+        UIScale.FixAll();   //--- 2026-07-03 캔버스 스케일 통일(창 크기 달라도 UI 안 깨지게)
         if (mapPanel == null)
             mapPanel = GameObject.Find("MapPanel")?.GetComponent<RectTransform>();
         if (goldText == null)
@@ -27,8 +28,71 @@ public class MapManager : MonoBehaviour
         CreateDeckButton();
         CreateHelpButton();
 
-        //--- 2026-07-01 노드 단위 자동 저장(이어하기). 맵에 올 때마다 현재 진행 상태 저장.
-        SaveSystem.Save();
+        if (CoopSession.Active)
+        {
+            //--- 2026-07-03 협동 맵: 세이브 없음. 서버 이벤트 구독(방장 진행 결과 goNode, 참여자 의견 emote).
+            var c = CoopClient.Instance;
+            if (c != null) { c.OnGoNode += HandleGoNode; c.OnMapEmote += HandleEmote; }
+            ShowCoopHint();
+        }
+        else
+        {
+            //--- 2026-07-01 노드 단위 자동 저장(이어하기). 맵에 올 때마다 현재 진행 상태 저장.
+            SaveSystem.Save();
+        }
+    }
+
+    //--- 2026-07-03 협동 맵 처리 ----
+    void HandleGoNode(int nodeId, int hp, int maxHp, int seed)
+    {
+        CoopSession.MonsterHp = hp;
+        CoopSession.MonsterMaxHp = maxHp;
+        CoopSession.MonsterSeed = seed;   // 양쪽 동일 몬스터 스폰용
+        Run.mapState.EnterNode(nodeId);
+        SceneManager.LoadScene("GameScene");
+    }
+
+    void HandleEmote(string from, int nodeId)
+    {
+        if (_mapContent == null) return;
+        var target = _mapContent.Find($"Node_{nodeId}");
+        if (target == null) return;
+        var go = new GameObject("Emote", typeof(RectTransform), typeof(Text));
+        go.layer = LayerMask.NameToLayer("UI");
+        go.transform.SetParent(target, false);
+        var txt = go.GetComponent<Text>();
+        txt.text = $"{from} 여기!";
+        txt.font = UIFont.Regular; txt.fontSize = 30; txt.color = new Color(1f, 0.9f, 0.4f);
+        txt.alignment = TextAnchor.MiddleCenter; txt.raycastTarget = false;
+        txt.horizontalOverflow = HorizontalWrapMode.Overflow; txt.verticalOverflow = VerticalWrapMode.Overflow;
+        var rt = (RectTransform)go.transform;
+        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f); rt.pivot = new Vector2(0.5f, 0f);
+        rt.anchoredPosition = new Vector2(0, 8); rt.sizeDelta = new Vector2(200, 44);
+        Destroy(go, 2.5f);
+    }
+
+    int ComputeCoopHp(NodeType type)
+    {
+        var p = MonsterRegistry.GetForNode(type);
+        float hp = p != null ? p.maxHp : 300f;
+        return Mathf.RoundToInt(hp * 2f);   // 2인 협동 보정
+    }
+
+    void ShowCoopHint()
+    {
+        var canvas = mapPanel != null ? mapPanel.GetComponentInParent<Canvas>() : FindFirstObjectByType<Canvas>();
+        if (canvas == null || canvas.transform.Find("CoopHint") != null) return;
+        bool host = CoopSession.PlayerId == 0;
+        var t = UIBuilder.Text(canvas.transform, "CoopHint",
+            host ? "협동 — 방장: 노드를 눌러 진행" : "협동 — 참여자: 노드를 누르면 의견 표시(진행은 방장)",
+            26, new Color(0.8f, 0.9f, 1f), TextAnchor.MiddleCenter);
+        UIBuilder.SetAnchors(t.rectTransform, new Vector2(0.2f, 0.94f), new Vector2(0.8f, 0.99f));
+    }
+
+    void OnDestroy()
+    {
+        var c = CoopClient.Instance;
+        if (c != null) { c.OnGoNode -= HandleGoNode; c.OnMapEmote -= HandleEmote; }
     }
 
     //--- 2026-07-01 튜토리얼 재열람 버튼
@@ -67,7 +131,9 @@ public class MapManager : MonoBehaviour
     {
         if (mapPanel == null) { Debug.LogError("MapPanel 못 찾음"); return; }
 
-        foreach (Transform child in mapPanel) Destroy(child.gameObject);
+        //--- 2026-07-03 맵 스크롤+확대: 노드/선을 큰 콘텐츠(_mapContent)에 담고 MapPanel을 뷰포트로 스크롤
+        var content = EnsureMapContent();
+        foreach (Transform child in content) Destroy(child.gameObject);
 
         var available = new HashSet<int>(Run.mapState.GetAvailableNextNodes());
 
@@ -84,21 +150,79 @@ public class MapManager : MonoBehaviour
 
         foreach (var node in Run.mapState.nodes)
             CreateNodeButton(node, available.Contains(node.id), Run.mapState.completedNodeIds.Contains(node.id));
+
+        ScrollToCurrent();   //--- 2026-07-03 진행 위치(현재 노드, 없으면 START)로 자동 스크롤
+    }
+
+    // 현재 노드(진행 위치)가 뷰포트 중앙에 오도록 스크롤. 시작 전이면 START(레이어0).
+    void ScrollToCurrent()
+    {
+        var scroll = mapPanel.GetComponent<ScrollRect>();
+        if (scroll == null || _mapContent == null) return;
+
+        MapNode target = Run.mapState.GetNode(Run.mapState.currentNodeId);
+        if (target == null) target = Run.mapState.nodes.Find(n => n.layer == 0);
+        if (target == null) return;
+
+        Canvas.ForceUpdateCanvases();
+        Vector2 p = target.uiPosition * MapZoom;
+        float W = _mapContent.sizeDelta.x, H = _mapContent.sizeDelta.y;
+        var vp = (RectTransform)mapPanel;
+        float vpW = vp.rect.width, vpH = vp.rect.height;
+
+        float contentX = p.x + W * 0.5f;   // 콘텐츠 좌측 기준 위치
+        float contentY = p.y + H * 0.5f;   // 콘텐츠 하단 기준 위치
+        scroll.horizontalNormalizedPosition = (W - vpW) > 1f ? Mathf.Clamp01((contentX - vpW * 0.5f) / (W - vpW)) : 0f;
+        scroll.verticalNormalizedPosition   = (H - vpH) > 1f ? Mathf.Clamp01((contentY - vpH * 0.5f) / (H - vpH)) : 0.5f;
+    }
+
+    //--- 2026-07-03 맵 확대 배율/노드 크기 + 스크롤 콘텐츠
+    const float MapZoom = 1.7f;
+    const float NodeSize = 150f;
+    RectTransform _mapContent;
+
+    RectTransform EnsureMapContent()
+    {
+        if (_mapContent != null) return _mapContent;
+
+        var scroll = mapPanel.GetComponent<ScrollRect>() ?? mapPanel.gameObject.AddComponent<ScrollRect>();
+        if (mapPanel.GetComponent<RectMask2D>() == null) mapPanel.gameObject.AddComponent<RectMask2D>();
+
+        var go = new GameObject("MapContent", typeof(RectTransform));
+        go.layer = LayerMask.NameToLayer("UI");
+        _mapContent = (RectTransform)go.transform;
+        _mapContent.SetParent(mapPanel, false);
+        _mapContent.anchorMin = _mapContent.anchorMax = new Vector2(0.5f, 0.5f);
+        _mapContent.pivot = new Vector2(0.5f, 0.5f);
+        _mapContent.anchoredPosition = Vector2.zero;
+
+        float maxX = 0f, maxY = 0f;
+        foreach (var n in Run.mapState.nodes) { maxX = Mathf.Max(maxX, Mathf.Abs(n.uiPosition.x)); maxY = Mathf.Max(maxY, Mathf.Abs(n.uiPosition.y)); }
+        _mapContent.sizeDelta = new Vector2(maxX * 2f * MapZoom + NodeSize + 240f, maxY * 2f * MapZoom + NodeSize + 240f);
+
+        scroll.content = _mapContent;
+        scroll.viewport = mapPanel;
+        scroll.horizontal = true;
+        scroll.vertical = true;
+        scroll.movementType = ScrollRect.MovementType.Clamped;   // 내용이 뷰포트 넘을 때만 스크롤(넘으면 보스쪽으로)
+        scroll.scrollSensitivity = 40f;
+        return _mapContent;   // 초기/진행 스크롤 위치는 BuildMapUI 끝의 ScrollToCurrent가 처리
     }
 
     // 두 노드를 잇는 선 (회전한 얇은 Image). 노드보다 뒤에 그려짐.
     void CreateEdge(Vector2 a, Vector2 b, bool highlight)
     {
         GameObject line = new GameObject("Edge", typeof(RectTransform), typeof(Image));
-        line.transform.SetParent(mapPanel, false);
+        line.transform.SetParent(_mapContent, false);
         line.layer = LayerMask.NameToLayer("UI");
 
+        Vector2 az = a * MapZoom, bz = b * MapZoom;
         RectTransform rt = line.GetComponent<RectTransform>();
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
         rt.pivot = new Vector2(0.5f, 0.5f);
-        Vector2 dir = b - a;
-        rt.sizeDelta = new Vector2(dir.magnitude, highlight ? 10f : 6f);
-        rt.anchoredPosition = (a + b) * 0.5f;
+        Vector2 dir = bz - az;
+        rt.sizeDelta = new Vector2(dir.magnitude, highlight ? 12f : 7f);
+        rt.anchoredPosition = (az + bz) * 0.5f;
         rt.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
 
         Image img = line.GetComponent<Image>();
@@ -109,14 +233,14 @@ public class MapManager : MonoBehaviour
     void CreateNodeButton(MapNode node, bool isAvailable, bool isCompleted)
     {
         GameObject go = new GameObject($"Node_{node.id}", typeof(RectTransform), typeof(Image), typeof(Button));
-        go.transform.SetParent(mapPanel, false);
+        go.transform.SetParent(_mapContent, false);
         go.layer = LayerMask.NameToLayer("UI");
 
         RectTransform rt = go.GetComponent<RectTransform>();
         rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);   // 중앙 기준(선 그리기와 좌표 일치)
         rt.pivot = new Vector2(0.5f, 0.5f);
-        rt.anchoredPosition = node.uiPosition;
-        rt.sizeDelta = new Vector2(100, 100);
+        rt.anchoredPosition = node.uiPosition * MapZoom;
+        rt.sizeDelta = new Vector2(NodeSize, NodeSize);
 
         Image img = go.GetComponent<Image>();
         img.color = GetNodeColor(node.type, isAvailable, isCompleted);
@@ -181,6 +305,24 @@ public class MapManager : MonoBehaviour
 
     void OnNodeClicked(MapNode node)
     {
+        //--- 2026-07-03 협동: 방장은 노드 선택(진행), 참여자는 이모트(의견). 실제 진행은 서버 goNode로.
+        if (CoopSession.Active)
+        {
+            var c = CoopClient.Instance;
+            if (c == null) return;
+            if (CoopSession.PlayerId == 0)
+            {
+                //--- 2026-07-03 방장이 몬스터 시드 결정 → 양쪽 동일 몬스터. HP/주기도 그 프로필에서.
+                int seed = UnityEngine.Random.Range(1, int.MaxValue);
+                var prof = MonsterRegistry.GetForNode(node.type, seed);
+                int hp = Mathf.RoundToInt((prof != null ? prof.maxHp : 300f) * 2f);
+                int interval = prof != null ? prof.attackInterval : 3;
+                c.MapSelect(node.id, hp, seed, interval);
+            }
+            else c.MapEmote(node.id);
+            return;
+        }
+
         Run.mapState.EnterNode(node.id);
         Debug.Log($"노드 진입: {node.type} (id={node.id})");
 

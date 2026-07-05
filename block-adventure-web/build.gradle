@@ -21,3 +21,8 @@ dependencies {
     // 2026-07-01 협동 멀티플레이용 WebSocket
     implementation 'org.springframework.boot:spring-boot-starter-websocket'
 }
+
+// 2026-07-03 다른 기기(IPv4)에서 8888 접속 되도록 JVM을 IPv4로 강제(IPv6 전용 바인딩 회피)
+tasks.named('bootRun') {
+    jvmArgs = ['-Djava.net.preferIPv4Stack=true']
+}

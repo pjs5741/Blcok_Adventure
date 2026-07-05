@@ -71,6 +71,6 @@ public class TitleMenu : MonoBehaviour
     void OnCoop()
     {
         CoopSession.Reset();
-        new GameObject("CoopMatchmaking").AddComponent<CoopMatchmaking>().Begin(_canvas);
+        new GameObject("CoopLobby").AddComponent<CoopLobby>().Begin(_canvas);
     }
 }

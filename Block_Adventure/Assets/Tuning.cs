@@ -14,13 +14,19 @@ public static class Tuning
 
     // 밸런스
     public const int DotStacksPerBlock = 3; // 독/화상 블록 1개당 부여 스택 (틱 데미지=스택 그대로 → 직관적)
-    public const int ShieldPerDelay = 5;    // 방패 N개당 몬스터 공격 1턴 지연
+    public const int ShieldPerDelay = 10;   //--- 2026-07-03 방패 N개당 몬스터 공격을 1턴 "지연"(스킵 아님)
+    public const int IntentCooldown = 3;    //--- 2026-07-03 특수 인텐트(시야가림/판회전 등) 재등장 쿨다운(픽 횟수)
     //--- 2026-07-01 흩어진 매직넘버 집결
     public const float HitKnockbackRatio = 0.12f;       // 피격 데미지가 최대체력 이 비율 이상이면 넉백, 미만이면 hit
     public const float GlassHeartFillThreshold = 0.6f;  // 유리 심장 유물 발동 그리드 충전율
 
     // 연출
     public const float HpBarLerpSpeed = 8f;             //--- 2026-07-01 몬스터 체력바 보간 속도(클수록 빠름)
+    //--- 2026-07-03 피격 데미지 숫자 팝업(sin 아치로 떠올랐다 내려옴)
+    public const float DamagePopupLife = 0.9f;          // 지속(초)
+    public const float DamagePopupRise = 3f;            // 최고 상승 높이(월드 단위)
+    public const float DamagePopupSize = 1f;            // TextMesh characterSize
+    public const float DamagePopupYOffset = 4f;         // 몬스터 기준 시작 높이
     public const float PoisonPulseRate = 6f;            // 독 상태 색 펄스 속도
     public const float PoisonColorIntensity = 0.7f;     // 독 색 보간 최대 강도(0~1)
     public const float BlockDestroyShakeStrength = 0.2f;// 블록 파괴 시 카메라 흔들림 강도

@@ -5,14 +5,20 @@ public static class CoopSession
 {
     public static bool Active;          // 협동 모드 여부
     public static int PlayerId = -1;    // 0 / 1
+    public static int Seed;             // 공유 맵 시드(방장 시작 시 서버가 전달)
     public static int MonsterHp;
     public static int MonsterMaxHp;
+    public static int MonsterSeed;      //--- 2026-07-03 현재 전투 몬스터 프로필 시드(양쪽 동일 스폰)
+    public static int AttackCountdown;  //--- 2026-07-03 다음 공격까지 남은 턴(서버 동기)
+    public static bool TutorialShown;   //--- 2026-07-03 협동 런 1회 튜토리얼 표시 여부
 
     public static void Reset()
     {
         Active = false;
         PlayerId = -1;
+        Seed = 0;
         MonsterHp = MonsterMaxHp = 0;
+        TutorialShown = false;
     }
 
     // WebGL은 접속한 페이지와 같은 오리진(같은 스프링 서버)으로, 그 외는 로컬 서버로 연결.

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using System.Collections;
 
@@ -32,12 +33,13 @@ public class GameManager : MonoBehaviour
     private int _turnCount;
 
     //--- 2026-07-01 협동(멀티) 상태
-    private bool _coopResolved, _coopMonsterDead, _coopPartnerLeft;
+    private bool _coopResolved, _coopPartnerLeft;
     private CoopClient.ResolveData _coopResolve;
 
     void Awake()
     {
         Instance = this;
+        UIScale.FixAll();   //--- 2026-07-03 캔버스 해상도 스케일 통일(창 크기 달라도 UI 안 깨지게)
         spawner = FindFirstObjectByType<BlockSpawner>();
         blockGrid = FindFirstObjectByType<BlockGrid>();
         battleManager = FindFirstObjectByType<BattleManager>();
@@ -54,9 +56,16 @@ public class GameManager : MonoBehaviour
         //--- 2026-07-01 전투 시작 시 플레이어 버프(방패/공격버프) 초기화 (전투 단위)
         if (Run.IsInitialized) Run.stats.ResetBattleBuffs();
 
-        //--- 2026-07-01 첫 전투에 1회만 튜토리얼 자동 표시 (협동에선 생략)
+        //--- 2026-07-03 튜토리얼: 싱글=최초 1회 / 협동=협동 런당 1회 무조건 표시
         var canvas = FindFirstObjectByType<Canvas>();
-        if (!CoopSession.Active && canvas != null) TutorialOverlay.ShowOnce(canvas.transform);
+        if (canvas != null)
+        {
+            if (CoopSession.Active)
+            {
+                if (!CoopSession.TutorialShown) { TutorialOverlay.Create(canvas.transform); CoopSession.TutorialShown = true; }
+            }
+            else TutorialOverlay.ShowOnce(canvas.transform);
+        }
 
         if (CoopSession.Active) SetupCoop(canvas);
 
@@ -67,7 +76,14 @@ public class GameManager : MonoBehaviour
     void SetupCoop(Canvas canvas)
     {
         var m = battleManager != null ? battleManager.currentMonster : null;
-        if (m != null && CoopSession.MonsterMaxHp > 0) m.SetMaxHp(CoopSession.MonsterMaxHp);
+        if (m != null)
+        {
+            //--- 2026-07-03 양쪽이 같은 몬스터(시드로 프로필 동기화) 스폰
+            var node = Run.mapState != null ? Run.mapState.GetNode(Run.mapState.currentNodeId) : null;
+            if (node != null) m.SetProfile(MonsterRegistry.GetForNode(node.type, CoopSession.MonsterSeed));
+            if (CoopSession.MonsterMaxHp > 0) m.SetMaxHp(CoopSession.MonsterMaxHp);
+            m.SetAttackCountdown(CoopSession.AttackCountdown);   //--- 2026-07-03 서버 동기 카운트다운 초기값
+        }
 
         if (canvas != null)
         {
@@ -78,25 +94,99 @@ public class GameManager : MonoBehaviour
         SpawnCoopBuddy();
 
         var c = CoopClient.Instance;
-        if (c != null) { c.OnResolve += OnCoopResolve; c.OnPartnerLeft += OnCoopPartnerLeft; }
+        if (c != null)
+        {
+            c.OnResolve += OnCoopResolve;
+            c.OnPartnerLeft += OnCoopPartnerLeft;
+            c.OnPartnerGrid += OnCoopPartnerGrid;   // 실시간 상대 그리드
+            c.OnBattleEnd += OnCoopBattleEnd;       // 전투 승리 → 맵 복귀/클리어
+            c.OnWaitPartner += OnCoopWaitPartner;   // 내가 락 완료, 상대 대기
+        }
     }
 
-    // 플레이어 옆에 상대 아바타(시각용). 위치는 라이브에서 미세 조정 필요.
+    //--- 2026-07-03 상대 대기 표시(내가 먼저 락 → 상대 기다리는 중)
+    private GameObject _waitOverlay;
+    void OnCoopWaitPartner() => ShowWaitOverlay(true);
+
+    void ShowWaitOverlay(bool show)
+    {
+        if (show && _waitOverlay == null)
+        {
+            var canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null) return;
+            _waitOverlay = UIBuilder.NewUI("CoopWait", canvas.transform, typeof(RectTransform), typeof(Image));
+            UIBuilder.Stretch((RectTransform)_waitOverlay.transform);
+            _waitOverlay.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.45f);
+            var t = UIBuilder.Text(_waitOverlay.transform, "T", "상대 플레이어를 기다리는 중...", 44, Color.white, TextAnchor.MiddleCenter);
+            UIBuilder.SetAnchors(t.rectTransform, new Vector2(0.1f, 0.42f), new Vector2(0.9f, 0.58f));
+        }
+        if (_waitOverlay != null) _waitOverlay.SetActive(show);
+    }
+
+    //--- 2026-07-03 협동 전투 종료: 보스면 클리어(EndScene), 아니면 맵 복귀
+    void OnCoopBattleEnd(int nodeId)
+    {
+        var node = Run.mapState != null ? Run.mapState.GetNode(nodeId) : null;
+        if (node != null && node.type == NodeType.Boss) { EndCoop(true); return; }
+        SceneManager.LoadScene("MapScene");   // 완료 처리는 MapManager.Start에서
+    }
+
+    //--- 2026-07-01 협동: 내 그리드(조작 중 블록 포함)를 상대에게 실시간 전송.
+    // 낭비 방지: 최대 5회/초로 체크하되 "직전 전송과 달라졌을 때만" 실제 전송(가만있으면 0회).
+    private float _coopGridTimer;
+    private int[] _coopLastSent;
+    void Update()
+    {
+        if (!CoopSession.Active) return;
+        _coopGridTimer += Time.deltaTime;
+        if (_coopGridTimer < 0.2f) return;   // 체크 주기(전송 상한 5회/초)
+        _coopGridTimer = 0f;
+
+        var c = CoopClient.Instance;
+        if (c == null || !c.Connected || blockGrid == null) return;
+
+        int[] flat = blockGrid.FlattenColors(spawner != null ? spawner.ActiveBlock : null);
+        if (GridEquals(flat, _coopLastSent)) return;   // 변화 없으면 전송 생략
+        _coopLastSent = flat;
+        c.SendGrid(flat);
+    }
+
+    static bool GridEquals(int[] a, int[] b)
+    {
+        if (b == null || a.Length != b.Length) return false;
+        for (int i = 0; i < a.Length; i++) if (a[i] != b[i]) return false;
+        return true;
+    }
+
+    void OnCoopPartnerGrid(int[] grid) => CoopPartnerView.Instance?.Render(grid);
+
+    // 플레이어 옆에 상대 아바타. 플레이어를 복제하되 로직/입력 스크립트만 제거 → Animator는 남아 애니메이션 재생(움직임).
     void SpawnCoopBuddy()
     {
         var player = FindFirstObjectByType<Player>();
         if (player == null) return;
-        var psr = player.GetComponentInChildren<SpriteRenderer>();
-        if (psr == null) return;
 
-        var buddy = new GameObject("CoopBuddy");
-        var sr = buddy.AddComponent<SpriteRenderer>();
-        sr.sprite = psr.sprite;
-        sr.color = new Color(0.8f, 0.85f, 1f);   // 살짝 다른 색조로 구분
-        sr.sortingOrder = psr.sortingOrder - 1;
-        buddy.transform.position = psr.transform.position + new Vector3(-3.5f, 0.8f, 0f);
-        buddy.transform.localScale = psr.transform.lossyScale;
+        var buddy = Instantiate(player.gameObject);
+        buddy.name = "CoopBuddy";
+
+        // MonoBehaviour(스크립트)만 전부 제거 — Animator/SpriteRenderer는 Component라 유지되어 애니 계속 재생
+        foreach (var mb in buddy.GetComponentsInChildren<MonoBehaviour>(true))
+            Destroy(mb);
+
+        buddy.transform.position = player.transform.position + new Vector3(-3.5f, 0.8f, 0f);
+        buddy.transform.rotation = player.transform.rotation;
+        buddy.transform.localScale = player.transform.localScale;
+
+        foreach (var sr in buddy.GetComponentsInChildren<SpriteRenderer>())
+        {
+            sr.color = new Color(0.8f, 0.85f, 1f);       // 색조로 구분
+            sr.sortingOrder = sr.sortingOrder - 1;
+        }
+
+        _coopBuddyAnim = buddy.GetComponentInChildren<Animator>();   // 버디 공격 모션용
     }
+
+    private Animator _coopBuddyAnim;
 
     IEnumerator GameLoop()
     {
@@ -140,9 +230,10 @@ public class GameManager : MonoBehaviour
         GameEvents.RaiseTurnStart();
 
         //--- 2026-06-30 인텐트 아래에 "공격까지 남은 턴" 표시
+        //--- 2026-07-03 카운트다운: 싱글=로컬 몬스터 소유값 / 협동=서버 동기값(resolve/goNode에서 SetAttackCountdown)
         var monster = battleManager != null ? battleManager.currentMonster : null;
-        if (monster != null && monsterAttackInterval > 0)
-            monster.SetAttackCountdown(monsterAttackInterval - (_turnCount % monsterAttackInterval));
+        if (monster != null && !CoopSession.Active)
+            monster.SetAttackCountdown(monster.AttackCountdown);
 
         // 피벗/중력전환 등 그리드 변형 연출이 진행 중이면 끝날 때까지 스폰 대기 (연출 중 스폰하면 위치/크기 불일치 버그)
         yield return new WaitUntil(() => blockGrid == null || !blockGrid.IsBusy);
@@ -171,14 +262,12 @@ public class GameManager : MonoBehaviour
         CurrentState = GameState.MonsterTurn;
         _turnCount++;
 
-        if (_turnCount % monsterAttackInterval == 0)
-        {
+        //--- 2026-07-03 공격 타이밍은 몬스터가 소유(주기+방패지연). 일반3/엘리트2/보스1턴.
+        var monster = battleManager != null ? battleManager.currentMonster : null;
+        if (monster != null && monster.AdvanceTurnAndCheckAttack())
             yield return StartCoroutine(battleManager.ExecuteMonsterAttack());
-        }
         else
-        {
             yield return null;
-        }
 
         GameEvents.RaiseTurnEnd();
     }
@@ -192,7 +281,7 @@ public class GameManager : MonoBehaviour
         int[] grid = blockGrid != null ? blockGrid.FlattenColors() : new int[0];
 
         _coopResolved = false; _coopResolve = null;
-        CoopClient.Instance?.SendReady(dmg, grid);
+        CoopClient.Instance?.SendTurnReady(dmg, grid);
 
         float guard = 0f;
         yield return new WaitUntil(() => _coopResolved || _coopPartnerLeft || (guard += Time.deltaTime) > 30f);
@@ -201,10 +290,24 @@ public class GameManager : MonoBehaviour
 
         if (_coopResolve != null && m != null)
         {
-            m.SetHp(_coopResolve.monsterHp);
+            //--- 2026-07-03 상대(버디) 공격 연출: 내 공격은 CalculatePhase에서 이미 재생됨 → 이어서 버디가 때리고 몹이 맞음
+            int partnerDmg = _coopResolve.partnerDamage;
+            if (partnerDmg > 0 && battleManager.HasLivingMonster())
+            {
+                if (_coopBuddyAnim != null) _coopBuddyAnim.SetTrigger("basicAttack");
+                yield return new WaitForSeconds(Tuning.MonsterTelegraph);
+                if (battleManager.HasLivingMonster()) m.TakeDamage(partnerDmg);   // 몹 피격 모션 + 데미지 팝업
+                yield return new WaitWhile(() => battleManager.HasLivingMonster() && m.IsHitReacting);
+            }
+
+            m.SetHp(_coopResolve.monsterHp);   // 서버 권위값으로 정합
+            m.SetAttackCountdown(_coopResolve.attackCountdown);   //--- 서버 동기 카운트다운
+            if (!string.IsNullOrEmpty(_coopResolve.intent) && _coopResolve.intent != "None")
+                m.SetIntentByName(_coopResolve.intent);   //--- 실제 인텐트 아이콘 반영(None이면 유지)
             CoopPartnerView.Instance?.Render(_coopResolve.partnerGrid);
-            if (_coopResolve.monsterDead) _coopMonsterDead = true;
-            else yield return StartCoroutine(ExecuteCoopIntent(_coopResolve.intent));
+            //--- 2026-07-03 이번 턴 공격이면 몬스터 공격 모션 + 인텐트 발동(위에서 SetIntentByName로 CurrentIntent 세팅됨)
+            if (!_coopResolve.monsterDead && !string.IsNullOrEmpty(_coopResolve.intent) && _coopResolve.intent != "None")
+                yield return StartCoroutine(battleManager.ExecuteMonsterAttack());
         }
         GameEvents.RaiseTurnEnd();
     }
@@ -212,6 +315,7 @@ public class GameManager : MonoBehaviour
     // 서버가 정한 몬스터 인텐트를 내 그리드에 실행(협동은 피벗/중력 제외)
     IEnumerator ExecuteCoopIntent(string intent)
     {
+        if (string.IsNullOrEmpty(intent) || intent == "None") yield break;   //--- 공격 없는 턴(주기 외)
         if (blockGrid != null)
         {
             switch (intent)
@@ -229,18 +333,25 @@ public class GameManager : MonoBehaviour
         StopAllCoroutines();
         CurrentState = victory ? GameState.GameClear : GameState.GameOver;
         Run.lastResult = victory ? RunResult.Victory : RunResult.GameOver;
-        CoopClient.Instance?.Leave();
+        CoopClient.Instance?.LeaveRoom();
         CoopSession.Reset();
         SceneManager.LoadScene("EndScene");
     }
 
-    void OnCoopResolve(CoopClient.ResolveData d) { _coopResolve = d; _coopResolved = true; }
+    void OnCoopResolve(CoopClient.ResolveData d) { _coopResolve = d; _coopResolved = true; ShowWaitOverlay(false); }
     void OnCoopPartnerLeft() { _coopPartnerLeft = true; }
 
     void OnDestroy()
     {
         var c = CoopClient.Instance;
-        if (c != null) { c.OnResolve -= OnCoopResolve; c.OnPartnerLeft -= OnCoopPartnerLeft; }
+        if (c != null)
+        {
+            c.OnResolve -= OnCoopResolve;
+            c.OnPartnerLeft -= OnCoopPartnerLeft;
+            c.OnPartnerGrid -= OnCoopPartnerGrid;
+            c.OnBattleEnd -= OnCoopBattleEnd;
+            c.OnWaitPartner -= OnCoopWaitPartner;
+        }
     }
 
     IEnumerator GameOverCheckPhase()
@@ -254,12 +365,8 @@ public class GameManager : MonoBehaviour
             yield break;
         }
 
-        //--- 2026-07-01 협동: 공유 몬스터 처치 = 승리(보상/맵 없음, 베타)
-        if (CoopSession.Active)
-        {
-            if (_coopMonsterDead) EndCoop(true);
-            yield break;
-        }
+        //--- 2026-07-03 협동: 승리(몹 처치)는 서버 battleEnd(OnCoopBattleEnd)가 맵복귀/클리어 처리. 여기선 진행만.
+        if (CoopSession.Active) yield break;
 
         if (battleManager != null && !battleManager.HasLivingMonster())
         {

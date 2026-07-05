@@ -59,32 +59,20 @@ public class BattleManager : MonoBehaviour
 
     public IEnumerator ExecuteMonsterAttack()
     {
-        if (HasLivingMonster())
-        {
-            //--- 2026-07-01 누적 방패 소모 → 공격 1턴 지연. 방패가 충분하면 이번 공격 스킵.
-            if (Run.stats.shieldStacks >= Tuning.ShieldPerDelay)
-            {
-                Run.stats.shieldStacks -= Tuning.ShieldPerDelay;
-                Debug.Log($"🛡 방패 {Tuning.ShieldPerDelay} 소모 → 몬스터 공격 1턴 지연 (남은 방패 {Run.stats.shieldStacks})");
-                yield break;
-            }
+        //--- 2026-07-03 공격 여부/방패지연 판정은 Monster.AdvanceTurnAndCheckAttack로 이관. 여기선 공격 수행만.
+        if (!HasLivingMonster()) yield break;
 
-            // 몬스터 자체 지연(있으면) — 한 턴 스킵
-            if (!currentMonster.ConsumeAttackDelay())
-                yield break;
+        //--- 2026-07-01 무한 대기 방지: 플레이어 공격 상태가 안 끝나도 가드 시간 지나면 통과
+        float exitGuard = 0f;
+        yield return new WaitUntil(() =>
+            (exitGuard += Time.deltaTime) > Tuning.AnimWaitGuard ||
+            !player.animator.GetCurrentAnimatorStateInfo(0).IsName("Player_BasicAttack"));
 
-            //--- 2026-07-01 무한 대기 방지: 플레이어 공격 상태가 안 끝나도 가드 시간 지나면 통과
-            float exitGuard = 0f;
-            yield return new WaitUntil(() =>
-                (exitGuard += Time.deltaTime) > Tuning.AnimWaitGuard ||
-                !player.animator.GetCurrentAnimatorStateInfo(0).IsName("Player_BasicAttack"));
+        //--- 2026-06-30 공격 예고(텔레그래프) — 인텐트 보고 대비할 틈. 너무 빨리 때리던 문제
+        yield return new WaitForSeconds(monsterTelegraph);
 
-            //--- 2026-06-30 공격 예고(텔레그래프) — 인텐트 보고 대비할 틈. 너무 빨리 때리던 문제
-            yield return new WaitForSeconds(monsterTelegraph);
-
-            player.animator.SetTrigger("hit");
-            yield return currentMonster.StartCoroutine(currentMonster.AttackCoroutine());
-        }
+        player.animator.SetTrigger("hit");
+        yield return currentMonster.StartCoroutine(currentMonster.AttackCoroutine());
     }
 
     // [TEST] 실제로는 맵에서 다음 노드 선택 후 새 몬스터 로드해야 함

@@ -10,16 +10,19 @@ public static class WebGLBuilder
         // 압축 끔 → 정적 서버 어디서든 그대로 동작
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
 
+        //--- 2026-07-02 TitleScene을 첫 씬(진입점)으로 포함(협동/이어하기 메뉴). 순서 = 빌드 인덱스.
         var scenes = new[]
         {
-            "Assets/Scenes/MapScene.unity",
+            "Assets/Scenes/TitleScene.unity",
             "Assets/Scenes/GameScene.unity",
+            "Assets/Scenes/MapScene.unity",
             "Assets/Scenes/ShopScene.unity",
             "Assets/Scenes/RestScene.unity",
             "Assets/Scenes/EndScene.unity",
         };
 
-        string outputPath = "Build/WebGL";
+        //--- 2026-07-02 스프링 static에 바로 빌드 → 복사 불필요. (프로젝트 루트 기준 상대경로)
+        string outputPath = "../block-adventure-web/src/main/resources/static";
 
         var opts = new BuildPlayerOptions
         {

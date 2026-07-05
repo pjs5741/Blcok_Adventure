@@ -40,6 +40,7 @@ public class TooltipUI : MonoBehaviour
         var canvas = canvasGO.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 30000;   // 항상 최상위
+        UIScale.Configure(canvasGO.GetComponent<CanvasScaler>());   //--- 2026-07-03 해상도 스케일 통일
 
         var panelGO = new GameObject("Panel", typeof(RectTransform), typeof(Image),
             typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));

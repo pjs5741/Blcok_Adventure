@@ -41,7 +41,8 @@ public static class MonsterRegistry
             intentPool = new[] { MonsterIntent.RowAttack, MonsterIntent.RowAttack,
                                  MonsterIntent.GravityShift, MonsterIntent.GravityShiftRight,
                                  MonsterIntent.Dispel, MonsterIntent.SelfCleanse },   // 버프 견제
-            rewardShapes = EliteShapes
+            rewardShapes = EliteShapes,
+            attackInterval = 2   // 엘리트: 2턴마다 공격
         },
     };
 
@@ -52,18 +53,28 @@ public static class MonsterRegistry
             intentPool = new[] { MonsterIntent.RowAttack, MonsterIntent.RowAttack,
                                  MonsterIntent.Pivot, MonsterIntent.ConvertBlocks,
                                  MonsterIntent.Dispel },   // 플레이어 버프 견제
-            rewardShapes = BossShapes
+            rewardShapes = BossShapes,
+            attackInterval = 1   // 보스: 매 턴 공격
         },
     };
 
     public static MonsterProfile GetForNode(NodeType type)
     {
-        MonsterProfile[] pool = type switch
-        {
-            NodeType.Elite => Elite(),
-            NodeType.Boss  => Boss(),
-            _              => Normal(),
-        };
+        var pool = PoolFor(type);
         return pool[Random.Range(0, pool.Length)];
     }
+
+    //--- 2026-07-03 협동: 시드로 결정적 선택(양쪽 클라가 같은 몬스터 스폰)
+    public static MonsterProfile GetForNode(NodeType type, int seed)
+    {
+        var pool = PoolFor(type);
+        return pool[new System.Random(seed).Next(pool.Length)];
+    }
+
+    static MonsterProfile[] PoolFor(NodeType type) => type switch
+    {
+        NodeType.Elite => Elite(),
+        NodeType.Boss  => Boss(),
+        _              => Normal(),
+    };
 }

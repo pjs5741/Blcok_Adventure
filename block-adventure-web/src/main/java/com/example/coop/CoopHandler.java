@@ -8,7 +8,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
-//--- 2026-07-01 협동 멀티 메시지 핸들러. join(매칭) / ready(턴 준비+데미지+그리드) / leave. 나머지 로직은 Room/RoomManager.
+//--- 2026-07-03 협동 메시지 핸들러. 연결 수립 시 로비 자동 등록(클라 전송 타이밍 불필요). 메시지는 RoomManager가 처리.
 @Component
 public class CoopHandler extends TextWebSocketHandler {
 
@@ -20,19 +20,18 @@ public class CoopHandler extends TextWebSocketHandler {
     }
 
     @Override
+    public void afterConnectionEstablished(WebSocketSession session) {
+        rooms.register(session);   // 연결되는 즉시 로비 등록 → "hello"(내 ID) + 로비 목록 전송
+    }
+
+    @Override
     protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
         JsonNode node = mapper.readTree(message.getPayload());
-        String type = node.path("type").asText("");
-        switch (type) {
-            case "join"  -> rooms.join(session);
-            case "ready" -> rooms.onReady(session, node);
-            case "leave" -> rooms.leave(session);
-            default      -> { /* 무시 */ }
-        }
+        rooms.handle(session, node);
     }
 
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        rooms.leave(session);
+        rooms.unregister(session);
     }
 }

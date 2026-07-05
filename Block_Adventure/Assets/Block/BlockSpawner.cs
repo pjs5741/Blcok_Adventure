@@ -157,6 +157,9 @@ public class BlockSpawner : MonoBehaviour
 
     public NextBlock? HeldBlock => _holdSlot;
 
+    //--- 2026-07-01 협동 실시간 미러링: 지금 조작 중인 블록(아직 안 굳음) 트랜스폼
+    public Transform ActiveBlock => _activeMovement != null ? _activeMovement.transform : null;
+
     bool HasHoldRelic() => Run.ownedRelics != null && Run.ownedRelics.Any(r => r is Relic_Hold);
     public bool HasClairvoyance() => Run.ownedRelics != null && Run.ownedRelics.Any(r => r is Relic_Clairvoyance);
 

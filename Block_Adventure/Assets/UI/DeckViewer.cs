@@ -13,11 +13,12 @@ public class DeckViewer : MonoBehaviour
 
     void BuildButtons()
     {
-        var canvasGO = new GameObject("DeckButtonsCanvas", typeof(Canvas), typeof(GraphicRaycaster));
+        var canvasGO = new GameObject("DeckButtonsCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
         canvasGO.transform.SetParent(transform, false);
         var canvas = canvasGO.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 15000;
+        UIScale.Configure(canvasGO.GetComponent<CanvasScaler>());   //--- 2026-07-03 해상도 스케일(빌드에서 글씨 안 보이던 문제)
         _canvas = canvasGO.transform;
 
         MakeButton("DrawBtn", "뽑을 카드", 0.56f, ShowDraw);

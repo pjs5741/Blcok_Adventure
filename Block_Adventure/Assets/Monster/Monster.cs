@@ -23,7 +23,10 @@ public class Monster : MonoBehaviour
     protected int _burnStacks = 0;
     //--- 2026-07-01 디버프 걸린 순서(작을수록 먼저=왼쪽). 소진되면 -1.
     protected int _poisonOrder = -1, _burnOrder = -1, _debuffSeq = 0;
-    protected int _attackDelay = 0; // 방패 효과로 누적된 공격 지연 턴 수
+    //--- 2026-07-03 공격 주기(프로필별) + 남은 카운트다운 + 특수 인텐트 쿨다운
+    protected int attackInterval = 3;   // 일반 3 / 엘리트 2 / 보스 1
+    protected int _attackCountdown = 3; // 다음 공격까지 남은 턴
+    int[] _intentCooldown;
 
     [Header("보상 블록")]
     [SerializeField] protected List<GameObject> rewardPool = new List<GameObject>();
@@ -72,6 +75,7 @@ public class Monster : MonoBehaviour
         _intentPool = p.intentPool;
         _rewardShapes = p.rewardShapes;
         _baseColor = p.tint;
+        attackInterval = Mathf.Max(1, p.attackInterval);   //--- 2026-07-03 공격 주기
         if (spriteRenderer != null) spriteRenderer.color = _baseColor;
         if (!string.IsNullOrEmpty(p.name)) gameObject.name = p.name;
     }
@@ -83,7 +87,9 @@ public class Monster : MonoBehaviour
         _poisonStacks = 0;
         _burnStacks = 0;
         _poisonOrder = -1; _burnOrder = -1; _debuffSeq = 0;
-        _attackDelay = 0;
+        _attackCountdown = Mathf.Max(1, attackInterval);
+        if (_intentCooldown == null) _intentCooldown = new int[System.Enum.GetValues(typeof(MonsterIntent)).Length];
+        else System.Array.Clear(_intentCooldown, 0, _intentCooldown.Length);
         UpdateUI();
         RefreshStatus();
         PickIntent();
@@ -122,22 +128,31 @@ public class Monster : MonoBehaviour
         Debug.Log($"✨ {gameObject.name} 정화 → 독·화상 제거");
     }
 
-    public void AddAttackDelay(int turns)
-    {
-        _attackDelay += turns;
-        Debug.Log($"🛡 {gameObject.name} 공격 {turns}턴 지연 (누적 {_attackDelay})");
-    }
+    public int AttackCountdown => Mathf.Max(0, _attackCountdown);
 
-    // 공격 시도 전 지연 차감. true 반환 시 공격 진행, false 시 스킵.
-    public bool ConsumeAttackDelay()
+    //--- 2026-07-03 매 몬스터 턴 호출. 방패(ShieldPerDelay당 1턴 지연) 반영 후 이번 턴 공격 여부 반환.
+    public bool AdvanceTurnAndCheckAttack()
     {
-        if (_attackDelay > 0)
+        _attackCountdown--;
+        if (_attackCountdown > 0) return false;
+
+        // 공격 예정 — 플레이어 방패가 있으면 ShieldPerDelay 소모해 1턴 미룸(스킵 아님, 계속 있으면 계속 미뤄짐)
+        if (Run.IsInitialized && Run.stats.shieldStacks >= Tuning.ShieldPerDelay)
         {
-            _attackDelay--;
-            Debug.Log($"🛡 {gameObject.name} 공격 지연 (남은 {_attackDelay})");
+            Run.stats.shieldStacks -= Tuning.ShieldPerDelay;
+            _attackCountdown = 1;
+            Debug.Log($"🛡 방패 {Tuning.ShieldPerDelay} 소모 → 공격 1턴 지연");
             return false;
         }
+        _attackCountdown = attackInterval;   // 공격 후 주기 리셋
         return true;
+    }
+
+    // 유물(수호의 손) 등 외부에서 공격을 turns턴 미룸
+    public void AddAttackDelay(int turns)
+    {
+        _attackCountdown += turns;
+        Debug.Log($"🛡 {gameObject.name} 공격 {turns}턴 지연 (남은 카운트 {_attackCountdown})");
     }
 
     //--- 2026-06-30 도트(독/화상) 인라인 이벤트 틱 폐기 → GameManager의 전용 DoT 페이즈(TickDoTRoutine)에서 처리(보이게).
@@ -304,10 +319,19 @@ public class Monster : MonoBehaviour
 
     public void PickIntent()
     {
+        if (_intentCooldown == null) _intentCooldown = new int[System.Enum.GetValues(typeof(MonsterIntent)).Length];
+        for (int i = 0; i < _intentCooldown.Length; i++) if (_intentCooldown[i] > 0) _intentCooldown[i]--;
+
+        MonsterIntent pick = MonsterIntent.RowAttack;
         if (_intentPool != null && _intentPool.Length > 0)
-            CurrentIntent = _intentPool[Random.Range(0, _intentPool.Length)];
-        else
-            CurrentIntent = MonsterIntent.RowAttack;   // 풀 미설정 시 기본
+        {
+            //--- 2026-07-03 쿨다운 중인 특수 인텐트 제외하고 선택(다 막히면 줄추가로 폴백)
+            var cand = new System.Collections.Generic.List<MonsterIntent>();
+            foreach (var it in _intentPool) if (_intentCooldown[(int)it] <= 0) cand.Add(it);
+            pick = cand.Count > 0 ? cand[Random.Range(0, cand.Count)] : MonsterIntent.RowAttack;
+        }
+        CurrentIntent = pick;
+        if (pick != MonsterIntent.RowAttack) _intentCooldown[(int)pick] = Tuning.IntentCooldown;   // 특수 인텐트 재등장 쿨다운
         RefreshIntent();
     }
 
@@ -316,6 +340,12 @@ public class Monster : MonoBehaviour
     {
         CurrentIntent = intent;
         RefreshIntent();
+    }
+
+    //--- 2026-07-03 협동: 서버가 정한 인텐트 이름으로 아이콘 반영(로컬 랜덤 인텐트 대신)
+    public void SetIntentByName(string name)
+    {
+        if (System.Enum.TryParse(name, out MonsterIntent it)) { CurrentIntent = it; RefreshIntent(); }
     }
 
     //--- 2026-06-30 공격까지 남은 턴 수 표시 (인텐트 아래). GameManager가 매 턴 갱신.
@@ -365,6 +395,9 @@ public class Monster : MonoBehaviour
 
         currentHp -= damage;
         Debug.Log($"🩸 {gameObject.name} 피격! -{damage}");
+
+        //--- 2026-07-03 데미지 숫자 팝업(sin 아치)
+        FloatingDamage.Spawn(transform.position + Vector3.up * Tuning.DamagePopupYOffset, damage, Color.white);
 
         Hit(damage);
         // UpdateUI 즉시 갱신 제거 → Update()에서 체력바 보간 (2026-07-01)

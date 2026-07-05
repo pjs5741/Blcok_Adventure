@@ -65,10 +65,11 @@ public class MapState
         {
             layerNodeIds[L] = new List<int>();
             int k = counts[L];
-            float y = (L - (numLayers - 1) / 2f) * ySpacing;
+            //--- 2026-07-03 가로 배치: 레이어=가로축(좌→우, START 왼쪽 / 보스 오른쪽), 같은 레이어=세로 분산
+            float x = (L - (numLayers - 1) / 2f) * xSpacing;
             for (int idx = 0; idx < k; idx++)
             {
-                float x = (idx - (k - 1) / 2f) * xSpacing;
+                float y = (idx - (k - 1) / 2f) * ySpacing;
                 s.nodes.Add(new MapNode
                 {
                     id = nextId,

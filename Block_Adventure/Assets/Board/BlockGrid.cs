@@ -53,8 +53,9 @@ public partial class BlockGrid : MonoBehaviour
         Run.gridSnapshot = snap;
     }
 
-    //--- 2026-07-01 협동: 그리드 색을 1차원(row-major, [x + y*width]) 배열로 평탄화 — 상대 미니뷰 전송용
-    public int[] FlattenColors()
+    //--- 2026-07-01 협동: 그리드 색을 1차원(row-major, [x + y*width]) 배열로 평탄화 — 상대 미니뷰 전송용.
+    // activeBlock 넘기면 아직 안 굳은 조작 중 블록도 겹쳐서(실시간 미러링) 포함.
+    public int[] FlattenColors(Transform activeBlock = null)
     {
         int[] flat = new int[data.width * data.height];
         for (int y = 0; y < data.height; y++)
@@ -63,6 +64,16 @@ public partial class BlockGrid : MonoBehaviour
                 var cell = data.gridArray[x, y];
                 if (cell == null) continue;
                 var bc = cell.GetComponent<BlockColor>();
+                flat[x + y * data.width] = bc != null ? bc.colorID : 0;
+            }
+
+        if (activeBlock != null)
+            foreach (Transform c in activeBlock)
+            {
+                int x = Mathf.RoundToInt(c.position.x);
+                int y = Mathf.RoundToInt(c.position.y);
+                if (x < 0 || x >= data.width || y < 0 || y >= data.height) continue;
+                var bc = c.GetComponent<BlockColor>();
                 flat[x + y * data.width] = bc != null ? bc.colorID : 0;
             }
         return flat;
