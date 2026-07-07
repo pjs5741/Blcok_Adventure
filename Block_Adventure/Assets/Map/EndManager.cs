@@ -8,6 +8,7 @@ public class EndManager : MonoBehaviour
     {
         //--- 2026-07-01 런 종료(승/패) → 세이브 삭제(끝난 런을 이어하기로 부활시키지 않음)
         SaveSystem.Delete();
+        UIScale.FixAll();   //--- 2026-07-06 캔버스 스케일(글씨 안 보이던 문제)
         SetupCanvas();
     }
 

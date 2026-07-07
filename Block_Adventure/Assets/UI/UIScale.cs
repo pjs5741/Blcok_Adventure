@@ -19,14 +19,14 @@ public static class UIScale
 
     public static void FixAll()
     {
-        foreach (var cs in Object.FindObjectsByType<CanvasScaler>(FindObjectsSortMode.None))
+        // 스케일러가 없는 캔버스엔 추가까지(보상/상점/휴식 등 씬 캔버스). 루트 캔버스만(스케일러는 루트에만 유효), 월드 캔버스 제외.
+        foreach (var canvas in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
         {
-            var canvas = cs.GetComponent<Canvas>();
-            if (canvas != null && canvas.renderMode == RenderMode.WorldSpace) continue;   // 월드 캔버스(몬스터 인텐트 등) 제외
-            cs.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            cs.referenceResolution = Reference;
-            cs.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            cs.matchWidthOrHeight = 0.5f;
+            if (!canvas.isRootCanvas) continue;
+            if (canvas.renderMode == RenderMode.WorldSpace) continue;
+            var cs = canvas.GetComponent<CanvasScaler>();
+            if (cs == null) cs = canvas.gameObject.AddComponent<CanvasScaler>();
+            Configure(cs);
         }
     }
 }

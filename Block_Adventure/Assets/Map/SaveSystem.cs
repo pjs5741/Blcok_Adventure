@@ -17,6 +17,9 @@ public static class SaveSystem
         public List<int> completedNodeIds;
         public List<int> relicIndices;
         public int lastResult;
+        //--- 2026-07-07 그리드(체력=진행상태)도 저장. 2차원 배열은 JSON 불가 → 평탄화(gridFlat[x + y*w]).
+        public int gridW, gridH;
+        public int[] gridFlat;
     }
 
     public static bool HasSave()
@@ -50,6 +53,17 @@ public static class SaveSystem
                 if (idx >= 0) data.relicIndices.Add(idx);
             }
 
+        //--- 2026-07-07 그리드 판 상태 저장(평탄화)
+        if (Run.gridSnapshot != null)
+        {
+            int w = Run.gridSnapshot.GetLength(0), h = Run.gridSnapshot.GetLength(1);
+            data.gridW = w; data.gridH = h;
+            data.gridFlat = new int[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    data.gridFlat[x + y * w] = Run.gridSnapshot[x, y];
+        }
+
         PlayerPrefs.SetString(Key, JsonUtility.ToJson(data));
         PlayerPrefs.Save();
         Debug.Log($"💾 저장 완료 (노드 {data.currentNodeId}, 덱 {data.deck?.Count}, 유물 {data.relicIndices.Count})");
@@ -67,7 +81,17 @@ public static class SaveSystem
         Run.mapState.currentNodeId = data.currentNodeId;
         Run.mapState.completedNodeIds = new HashSet<int>(data.completedNodeIds ?? new List<int>());
         Run.lastResult = (RunResult)data.lastResult;
-        Run.gridSnapshot = null;                                      // 노드 단위 저장 → 전투는 새로 시작
+
+        //--- 2026-07-07 그리드(진행상태) 복원
+        if (data.gridFlat != null && data.gridW > 0 && data.gridH > 0 && data.gridFlat.Length == data.gridW * data.gridH)
+        {
+            var g = new int[data.gridW, data.gridH];
+            for (int y = 0; y < data.gridH; y++)
+                for (int x = 0; x < data.gridW; x++)
+                    g[x, y] = data.gridFlat[x + y * data.gridW];
+            Run.gridSnapshot = g;
+        }
+        else Run.gridSnapshot = null;
 
         Run.ownedRelics = new List<Relic>();
         if (data.relicIndices != null)

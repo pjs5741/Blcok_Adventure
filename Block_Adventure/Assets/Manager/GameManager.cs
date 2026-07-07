@@ -123,11 +123,21 @@ public class GameManager : MonoBehaviour
         if (_waitOverlay != null) _waitOverlay.SetActive(show);
     }
 
-    //--- 2026-07-03 협동 전투 종료: 보스면 클리어(EndScene), 아니면 맵 복귀
-    void OnCoopBattleEnd(int nodeId)
+    //--- 2026-07-06 협동 전투 종료: 보상(개인별) → 그리드 저장(유지) → 보스면 클리어, 아니면 맵 복귀
+    private bool _coopEnded;   // 협동 전투 종료 → 게임 루프 정지(보상 중 블록 재스폰 방지)
+    void OnCoopBattleEnd(int nodeId) { _coopEnded = true; StartCoroutine(CoopBattleEndRoutine(nodeId)); }
+
+    IEnumerator CoopBattleEndRoutine(int nodeId)
     {
         var node = Run.mapState != null ? Run.mapState.GetNode(nodeId) : null;
-        if (node != null && node.type == NodeType.Boss) { EndCoop(true); return; }
+
+        // 보상: 각자 자기 덱에 카드 획득(개인별)
+        if (rewardManager != null && battleManager != null)
+            yield return StartCoroutine(rewardManager.ShowReward(battleManager.currentMonster));
+
+        if (blockGrid != null) blockGrid.SaveSnapshot();   // 협동도 그리드 유지(다음 전투로 이어짐)
+
+        if (node != null && node.type == NodeType.Boss) { EndCoop(true); yield break; }
         SceneManager.LoadScene("MapScene");   // 완료 처리는 MapManager.Start에서
     }
 
@@ -192,7 +202,7 @@ public class GameManager : MonoBehaviour
     {
         yield return new WaitForSeconds(0.3f);
 
-        while (CurrentState != GameState.GameOver && CurrentState != GameState.GameClear)
+        while (CurrentState != GameState.GameOver && CurrentState != GameState.GameClear && !_coopEnded)
         {
             yield return StartCoroutine(PlayerTurnPhase());
             if (IsTerminated()) break;
@@ -277,11 +287,14 @@ public class GameManager : MonoBehaviour
     {
         CurrentState = GameState.MonsterTurn;
         var m = battleManager != null ? battleManager.currentMonster : null;
-        int dmg = m != null ? Mathf.Max(0, Mathf.RoundToInt(hpBefore - m.CurrentHp)) : 0;
+
+        //--- 2026-07-06 이번 턴 내 데미지 = 공격(계산됨, 아직 미적용) + 도트(DotPhase에서 HP 감소분). 공격 연출은 resolve에서.
+        int atkDmg = blockGrid != null ? Mathf.Max(0, Mathf.RoundToInt(blockGrid.CoopLastAttackDmg)) : 0;
+        int dotDmg = m != null ? Mathf.Max(0, Mathf.RoundToInt(hpBefore - m.CurrentHp)) : 0;
         int[] grid = blockGrid != null ? blockGrid.FlattenColors() : new int[0];
 
         _coopResolved = false; _coopResolve = null;
-        CoopClient.Instance?.SendTurnReady(dmg, grid);
+        CoopClient.Instance?.SendTurnReady(atkDmg + dotDmg, grid);
 
         float guard = 0f;
         yield return new WaitUntil(() => _coopResolved || _coopPartnerLeft || (guard += Time.deltaTime) > 30f);
@@ -290,13 +303,23 @@ public class GameManager : MonoBehaviour
 
         if (_coopResolve != null && m != null)
         {
-            //--- 2026-07-03 상대(버디) 공격 연출: 내 공격은 CalculatePhase에서 이미 재생됨 → 이어서 버디가 때리고 몹이 맞음
+            var player = battleManager != null ? battleManager.player : null;
             int partnerDmg = _coopResolve.partnerDamage;
+
+            //--- 2026-07-06 둘 다 조작 끝난 뒤(지금) 동시에 재생: 내 공격 → 몹 피격, 이어서 상대(버디) 공격 → 몹 피격
+            if (atkDmg > 0 && battleManager.HasLivingMonster())
+            {
+                if (player != null) player.Attack();
+                yield return new WaitForSeconds(Tuning.MonsterTelegraph);
+                if (battleManager.HasLivingMonster()) m.TakeDamage(atkDmg);   // 이때 HP 깎임 + 팝업 + 피격
+                yield return new WaitWhile(() => battleManager.HasLivingMonster() && m.IsHitReacting);
+            }
+
             if (partnerDmg > 0 && battleManager.HasLivingMonster())
             {
                 if (_coopBuddyAnim != null) _coopBuddyAnim.SetTrigger("basicAttack");
                 yield return new WaitForSeconds(Tuning.MonsterTelegraph);
-                if (battleManager.HasLivingMonster()) m.TakeDamage(partnerDmg);   // 몹 피격 모션 + 데미지 팝업
+                if (battleManager.HasLivingMonster()) m.TakeDamage(partnerDmg);
                 yield return new WaitWhile(() => battleManager.HasLivingMonster() && m.IsHitReacting);
             }
 

@@ -32,7 +32,16 @@ public class MapManager : MonoBehaviour
         {
             //--- 2026-07-03 협동 맵: 세이브 없음. 서버 이벤트 구독(방장 진행 결과 goNode, 참여자 의견 emote).
             var c = CoopClient.Instance;
-            if (c != null) { c.OnGoNode += HandleGoNode; c.OnMapEmote += HandleEmote; }
+            if (c != null)
+            {
+                c.OnGoNode += HandleGoNode;
+                c.OnMapEmote += HandleEmote;
+                c.OnAdvanceReady += HandleAdvanceReady;       // 둘 다 완료 → 진행 가능
+                c.OnWaitPartnerNode += HandleWaitPartnerNode; // 상대 아직 진행 중
+                //--- 2026-07-07 맵 복귀 = 현재 노드 완료 신호. 둘 다 완료해야 방장이 다음 진행 가능.
+                _coopCanAdvance = false;
+                c.SendNodeDone();
+            }
             ShowCoopHint();
         }
         else
@@ -45,11 +54,21 @@ public class MapManager : MonoBehaviour
     //--- 2026-07-03 협동 맵 처리 ----
     void HandleGoNode(int nodeId, int hp, int maxHp, int seed)
     {
-        CoopSession.MonsterHp = hp;
-        CoopSession.MonsterMaxHp = maxHp;
-        CoopSession.MonsterSeed = seed;   // 양쪽 동일 몬스터 스폰용
         Run.mapState.EnterNode(nodeId);
-        SceneManager.LoadScene("GameScene");
+        var node = Run.mapState.GetNode(nodeId);
+        NodeType t = node != null ? node.type : NodeType.Battle;
+        switch (t)
+        {
+            case NodeType.Shop:  SceneManager.LoadScene("ShopScene"); break;
+            case NodeType.Rest:  SceneManager.LoadScene("RestScene"); break;
+            case NodeType.Event: ShowEvent(); break;   // 맵 오버레이(각자 개별 해결)
+            default:                                    // Start/Battle/Elite/Boss
+                CoopSession.MonsterHp = hp;
+                CoopSession.MonsterMaxHp = maxHp;
+                CoopSession.MonsterSeed = seed;
+                SceneManager.LoadScene("GameScene");
+                break;
+        }
     }
 
     void HandleEmote(string from, int nodeId)
@@ -78,21 +97,41 @@ public class MapManager : MonoBehaviour
         return Mathf.RoundToInt(hp * 2f);   // 2인 협동 보정
     }
 
+    private bool _coopCanAdvance;   //--- 2026-07-07 둘 다 노드 완료 시 true → 방장 진행 가능
+    private Text _coopHint;
+
     void ShowCoopHint()
     {
         var canvas = mapPanel != null ? mapPanel.GetComponentInParent<Canvas>() : FindFirstObjectByType<Canvas>();
-        if (canvas == null || canvas.transform.Find("CoopHint") != null) return;
-        bool host = CoopSession.PlayerId == 0;
-        var t = UIBuilder.Text(canvas.transform, "CoopHint",
-            host ? "협동 — 방장: 노드를 눌러 진행" : "협동 — 참여자: 노드를 누르면 의견 표시(진행은 방장)",
-            26, new Color(0.8f, 0.9f, 1f), TextAnchor.MiddleCenter);
-        UIBuilder.SetAnchors(t.rectTransform, new Vector2(0.2f, 0.94f), new Vector2(0.8f, 0.99f));
+        if (canvas == null) return;
+        _coopHint = canvas.transform.Find("CoopHint")?.GetComponent<Text>();
+        if (_coopHint == null)
+        {
+            _coopHint = UIBuilder.Text(canvas.transform, "CoopHint", "", 26, new Color(0.8f, 0.9f, 1f), TextAnchor.MiddleCenter);
+            UIBuilder.SetAnchors(_coopHint.rectTransform, new Vector2(0.15f, 0.94f), new Vector2(0.85f, 0.99f));
+        }
+        UpdateCoopHint();
     }
+
+    void UpdateCoopHint()
+    {
+        if (_coopHint == null) return;
+        bool host = CoopSession.PlayerId == 0;
+        if (!_coopCanAdvance) _coopHint.text = "상대가 아직 진행 중 — 둘 다 완료해야 진행돼요";
+        else _coopHint.text = host ? "협동 — 방장: 노드를 눌러 진행" : "협동 — 참여자: 노드 누르면 의견(진행은 방장)";
+    }
+
+    void HandleAdvanceReady() { _coopCanAdvance = true; UpdateCoopHint(); }        // 둘 다 노드 완료
+    void HandleWaitPartnerNode() { _coopCanAdvance = false; UpdateCoopHint(); }    // 상대 아직 진행 중
 
     void OnDestroy()
     {
         var c = CoopClient.Instance;
-        if (c != null) { c.OnGoNode -= HandleGoNode; c.OnMapEmote -= HandleEmote; }
+        if (c != null)
+        {
+            c.OnGoNode -= HandleGoNode; c.OnMapEmote -= HandleEmote;
+            c.OnAdvanceReady -= HandleAdvanceReady; c.OnWaitPartnerNode -= HandleWaitPartnerNode;
+        }
     }
 
     //--- 2026-07-01 튜토리얼 재열람 버튼
@@ -312,12 +351,21 @@ public class MapManager : MonoBehaviour
             if (c == null) return;
             if (CoopSession.PlayerId == 0)
             {
-                //--- 2026-07-03 방장이 몬스터 시드 결정 → 양쪽 동일 몬스터. HP/주기도 그 프로필에서.
+                //--- 2026-07-07 둘 다 현재 노드 완료해야 다음 진행. 아직이면 대기 안내.
+                if (!_coopCanAdvance) { HandleWaitPartnerNode(); return; }
+
+                //--- 2026-07-06 노드 타입에 따라 전투/비전투(상점·휴식·이벤트) 라우팅. 전투면 몬스터 시드로 동기화.
+                bool isBattle = node.type == NodeType.Start || node.type == NodeType.Battle
+                             || node.type == NodeType.Elite || node.type == NodeType.Boss;
                 int seed = UnityEngine.Random.Range(1, int.MaxValue);
-                var prof = MonsterRegistry.GetForNode(node.type, seed);
-                int hp = Mathf.RoundToInt((prof != null ? prof.maxHp : 300f) * 2f);
-                int interval = prof != null ? prof.attackInterval : 3;
-                c.MapSelect(node.id, hp, seed, interval);
+                int hp = 0, interval = 3;
+                if (isBattle)
+                {
+                    var prof = MonsterRegistry.GetForNode(node.type, seed);
+                    hp = Mathf.RoundToInt((prof != null ? prof.maxHp : 300f) * 2f);
+                    interval = prof != null ? prof.attackInterval : 3;
+                }
+                c.MapSelect(node.id, isBattle, hp, seed, interval);
             }
             else c.MapEmote(node.id);
             return;

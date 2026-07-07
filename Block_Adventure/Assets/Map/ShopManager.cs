@@ -25,6 +25,7 @@ public class ShopManager : MonoBehaviour
     void Start()
     {
         if (!Run.IsInitialized) Run.StartNew();
+        UIScale.FixAll();   //--- 2026-07-06 캔버스 스케일(글씨 안 보이던 문제)
         SetupCanvas();
         GenerateOffers();
         BuildUI();
@@ -93,12 +94,15 @@ public class ShopManager : MonoBehaviour
         for (int i = 0; i < cardOffers.Count; i++, idx++)
         {
             int captured = i;
+            bool sold = cardOffers[i] == null;
             GameObject slot = CreateItemSlot(idx * slotW, (idx + 1) * slotW,
-                cardOffers[i] != null ? $"{cardOffers[i].name}\n[{BlockColors.Name(cardColorIDs[i])}]" : "(판매됨)",
-                cardOffers[i] != null ? cardPrice : 0,
-                cardOffers[i] != null,
+                sold ? "(판매됨)" : BlockColors.Name(cardColorIDs[i]),   // 효과 이름만(모양은 셀로 표시)
+                sold ? 0 : cardPrice,
+                !sold,
                 () => BuyCard(captured),
-                new Color(0.25f, 0.35f, 0.55f));
+                new Color(0.25f, 0.35f, 0.55f),
+                sold ? null : cardOffers[i].name,          // 블록 모양(프리팹 이름)
+                sold ? -1 : cardColorIDs[i]);              // 색
             cardSlots.Add(slot);
         }
         for (int i = 0; i < relicOffers.Count; i++, idx++)
@@ -114,7 +118,7 @@ public class ShopManager : MonoBehaviour
         }
     }
 
-    GameObject CreateItemSlot(float anchorMinX, float anchorMaxX, string itemName, int price, bool available, System.Action onBuy, Color bgColor)
+    GameObject CreateItemSlot(float anchorMinX, float anchorMaxX, string itemName, int price, bool available, System.Action onBuy, Color bgColor, string shapeName = null, int colorID = -1)
     {
         GameObject slot = new GameObject($"Slot_{itemName}", typeof(RectTransform), typeof(Image));
         slot.transform.SetParent(itemContainer, false);
@@ -129,7 +133,18 @@ public class ShopManager : MonoBehaviour
         Image img = slot.GetComponent<Image>();
         img.color = available ? bgColor : new Color(0.2f, 0.2f, 0.2f);
 
-        Text nameText = CreateChildText(slot.transform, "Name", new Vector2(0, 0.55f), new Vector2(1, 0.85f), itemName, 36, Color.white);
+        //--- 2026-07-06 카드면 블록 모양(색 셀) + 효과 이름, 아니면(유물/판매됨) 이름 텍스트
+        if (shapeName != null && colorID > 0)
+        {
+            var shapeHost = UIBuilder.NewUI("Shape", slot.transform, typeof(RectTransform));
+            UIBuilder.SetAnchors((RectTransform)shapeHost.transform, new Vector2(0.15f, 0.5f), new Vector2(0.85f, 0.9f));
+            ShapeMiniView.Build((RectTransform)shapeHost.transform, shapeName, colorID, 30f);
+            CreateChildText(slot.transform, "Name", new Vector2(0, 0.4f), new Vector2(1, 0.5f), itemName, 30, Color.white);
+        }
+        else
+        {
+            CreateChildText(slot.transform, "Name", new Vector2(0, 0.55f), new Vector2(1, 0.85f), itemName, 36, Color.white);
+        }
 
         if (price > 0)
         {

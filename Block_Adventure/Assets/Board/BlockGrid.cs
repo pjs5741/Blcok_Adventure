@@ -21,6 +21,7 @@ public partial class BlockGrid : MonoBehaviour
     // public event Action<AttackContext> OnMatchCompleted;
 
     private PlayerStats playerStats;
+    public float CoopLastAttackDmg;   //--- 2026-07-06 협동: 이번 턴 계산된 공격 데미지(연출/적용은 resolve에서)
 
     void Awake()
     {

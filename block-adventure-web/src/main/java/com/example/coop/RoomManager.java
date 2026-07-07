@@ -60,6 +60,7 @@ public class RoomManager {
             case "startGame"  -> withRoom(s, r -> r.startByHost(s));
             case "mapSelect"  -> withRoom(s, r -> r.onMapSelect(s, node));   // 방장 노드 선택
             case "mapEmote"   -> withRoom(s, r -> r.onMapEmote(s, node));    // 참여자 의견
+            case "nodeDone"   -> withRoom(s, r -> r.onNodeDone(s));          // 노드 완료(맵 복귀)
             case "turnReady"  -> withRoom(s, r -> r.onTurnReady(s, node));
             case "grid"       -> withRoom(s, r -> r.onGrid(s, node));
             default -> { /* 무시 */ }

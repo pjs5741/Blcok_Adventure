@@ -59,6 +59,14 @@ public class RewardManager : MonoBehaviour
     {
         _isProceeded = false;
 
+        //--- 2026-07-06 골드 보상: 눈에 보이게 지급(조용히 안 올림)
+        if (monster != null)
+        {
+            int g = monster.GoldReward;
+            Run.stats.gold += g;
+            ShowGoldReward(g);
+        }
+
         //--- 2026-06-30 카드마다 모양(몬스터별 가중치 독립추첨) + 색(효과)을 함께 확정. 색은 카드에 고정되어 덱에 들어감.
         var shapes = monster != null ? monster.RewardShapes : null;
         for (int i = 0; i < rewardCards.Length; i++)
@@ -86,6 +94,19 @@ public class RewardManager : MonoBehaviour
         cardSelectPanel.SetActive(false);
         rewardSelectPanel.SetActive(false);
         gameObject.SetActive(false);
+    }
+
+    //--- 2026-07-06 보상창에 골드 획득 표시
+    void ShowGoldReward(int amount)
+    {
+        if (rewardSelectPanel == null) return;
+        var t = rewardSelectPanel.transform.Find("GoldReward")?.GetComponent<Text>();
+        if (t == null)
+        {
+            t = UIBuilder.Text(rewardSelectPanel.transform, "GoldReward", "", 40, new Color(1f, 0.85f, 0.3f), TextAnchor.MiddleCenter);
+            UIBuilder.SetAnchors(t.rectTransform, new Vector2(0.2f, 0.8f), new Vector2(0.8f, 0.9f));
+        }
+        t.text = $"골드 +{amount} 획득!";
     }
 
     //--- 2026-06-30 모양 가중 추첨(카드 1장 = 1회 독립시행). 가중치 없거나 로드 실패 시 기본 풀로 폴백.

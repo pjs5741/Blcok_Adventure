@@ -24,6 +24,7 @@ public class Room {
     private final WebSocketSession[] players = new WebSocketSession[2]; // 0=방장, 1=참여자
     private final String[] shortIds = new String[2];
     private final boolean[] roomReady = new boolean[2];
+    private final boolean[] nodeReady = new boolean[2];   //--- 2026-07-07 현재 노드 완료(맵 복귀). 둘 다여야 다음 노드 진행
     private boolean started;      // 게임 시작(맵 단계 진입)
 
     // 맵/전투 상태
@@ -101,18 +102,33 @@ public class Room {
     // 방장이 다음 노드 선택(몹HP는 방장이 노드 타입 보고 계산해 동봉) → 전투 시작
     public synchronized void onMapSelect(WebSocketSession s, JsonNode node) {
         if (indexOf(s) != 0 || !started || inBattle) return;   // 방장만, 전투 중 아님
+        //--- 2026-07-07 둘 다 현재 노드 완료(맵 복귀)해야 다음 진행. 아니면 방장에게 대기 알림.
+        if (!(nodeReady[0] && nodeReady[1])) { send(0, obj("type", "waitPartnerNode")); return; }
+        nodeReady[0] = nodeReady[1] = false;   // 새 노드 진입 → 둘 다 다시 완료해야 함
         currentNodeId = node.path("nodeId").asInt(-1);
-        monsterMaxHp = Math.max(1, node.path("monsterHp").asInt(600));
-        monsterHp = monsterMaxHp;
         monsterSeed = node.path("monsterSeed").asInt(0);
-        coopAttackInterval = Math.max(1, node.path("attackInterval").asInt(3));
-        inBattle = true;
-        battleTurn = 0; lastIntentIdx = -1;
-        turnReady[0] = turnReady[1] = false; dmg[0] = dmg[1] = 0; firstReadyAt = 0;
+        boolean isBattle = node.path("isBattle").asBoolean(true);
+        if (isBattle) {
+            monsterMaxHp = Math.max(1, node.path("monsterHp").asInt(600));
+            monsterHp = monsterMaxHp;
+            coopAttackInterval = Math.max(1, node.path("attackInterval").asInt(3));
+            inBattle = true;
+            battleTurn = 0; lastIntentIdx = -1;
+            turnReady[0] = turnReady[1] = false; dmg[0] = dmg[1] = 0; firstReadyAt = 0;
+        }
+        // 전투/비전투 모두 goNode 전송 → 클라가 노드 타입 보고 씬(전투/상점/휴식/이벤트) 라우팅. 비전투면 턴 루프 없음.
         for (int i = 0; i < 2; i++)
             send(i, obj("type", "goNode", "nodeId", currentNodeId,
                     "monsterHp", monsterHp, "monsterMaxHp", monsterMaxHp, "monsterSeed", monsterSeed,
-                    "attackCountdown", coopAttackInterval));   // 전투 시작 → 첫 공격까지 interval턴
+                    "attackCountdown", coopAttackInterval));
+    }
+
+    // 노드 완료(맵 복귀) 신호. 둘 다 완료되면 진행 가능 알림.
+    public synchronized void onNodeDone(WebSocketSession s) {
+        int i = indexOf(s);
+        if (i < 0) return;
+        nodeReady[i] = true;
+        if (nodeReady[0] && nodeReady[1]) { send(0, obj("type", "advanceReady")); send(1, obj("type", "advanceReady")); }
     }
 
     // 참여자(또는 누구든) 노드 클릭 → 의견 이모트 브로드캐스트

@@ -19,6 +19,7 @@ public class RestManager : MonoBehaviour
     void Start()
     {
         if (!Run.IsInitialized) Run.StartNew();
+        UIScale.FixAll();   //--- 2026-07-06 캔버스 스케일(글씨 안 보이던 문제)
         //--- 2026-07-01 스냅샷이 있으면 그 실제 차원을 따름(피벗으로 스왑된 경우 대비). 없으면 기본 생성.
         if (Run.gridSnapshot == null) Run.gridSnapshot = new int[gridWidth, gridHeight];
         gridWidth = Run.gridSnapshot.GetLength(0);

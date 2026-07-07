@@ -56,6 +56,7 @@ public partial class BlockGrid
         bool hasEvent = false;
         comboCount = 0;
         currentDamageMultiplier = 1f;
+        CoopLastAttackDmg = 0f;   //--- 2026-07-06 협동: 이번 턴 공격 데미지 누적(연출은 resolve에서)
 
         // 락 직후 폭탄 자동 폭발 (반경1 AoE) — 줄/색매칭 검사 전에 먼저 처리
         yield return StartCoroutine(ExplodeBombs());
@@ -190,9 +191,15 @@ public partial class BlockGrid
                 if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(Tuning.BlockDestroyShakeStrength, Tuning.BlockDestroyShakeDuration);
                 yield return new WaitForSeconds(destroyDuration + 0.05f);
 
-                //--- 2026-06-30 블록 깨진 뒤 공격: 플레이어 공격/몬스터 피격 모션이 "끝날 때까지" 대기(고정 시간 X) → 그 다음 중력
+                //--- 2026-06-30 블록 깨진 뒤 공격. 협동은 공격 연출을 resolve(둘 다 조작 후)로 미룸 → 여기선 데미지만 계산+디버프 적용.
                 var battle = GameManager.Instance != null ? GameManager.Instance.battleManager : null;
-                if (battle != null) yield return StartCoroutine(battle.AttackRoutine(ctx));
+                if (CoopSession.Active)
+                {
+                    var mon = battle != null ? battle.currentMonster : null;
+                    if (mon != null) IconEffects.Apply(ctx, mon);   // 독/화상/방패는 즉시(다음 DoT용)
+                    CoopLastAttackDmg += playerStats.EffectiveDamage * ctx.damageMultiplier;   // 몹 HP는 안 깎음(resolve에서)
+                }
+                else if (battle != null) yield return StartCoroutine(battle.AttackRoutine(ctx));
 
                 if (matchBlocks.Count > 0)
                     ApplyGravity();

@@ -413,16 +413,17 @@ public class Monster : MonoBehaviour
     protected virtual void Die()
     {
         isDead = true;
-        int reward = CalculateGoldReward();
-        Debug.Log($"💀 {gameObject.name} 사망! (보상: {reward}골드)");
-
-        Run.stats.gold += reward;
+        //--- 2026-07-06 골드는 보상창(RewardManager)에서 눈에 보이게 지급 → 여기선 조용히 안 올림
+        Debug.Log($"💀 {gameObject.name} 사망!");
 
         GameEvents.RaiseMonsterDeath();
 
         // 기본 사망 연출: 그냥 꺼지기
         gameObject.SetActive(false);
     }
+
+    //--- 2026-07-06 이 몹 처치 골드 보상(노드 타입 배율 포함). 보상창에서 지급/표시.
+    public int GoldReward => CalculateGoldReward();
 
     int CalculateGoldReward()
     {

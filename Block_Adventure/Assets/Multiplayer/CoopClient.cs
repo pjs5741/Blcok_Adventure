@@ -34,6 +34,8 @@ public class CoopClient : MonoBehaviour
     public Action<int, int, int, int> OnGoNode;    // nodeId, monsterHp, monsterMaxHp, monsterSeed (전투 시작)
     public Action<int> OnBattleEnd;                // nodeId (전투 승리 → 맵 복귀)
     public Action<string, int> OnMapEmote;         // from, nodeId (의견 이모트)
+    public Action OnAdvanceReady;                  // 둘 다 노드 완료 → 다음 진행 가능
+    public Action OnWaitPartnerNode;               // 상대가 아직 현재 노드 진행 중
     // ---- 전투 이벤트 ----
     public Action<ResolveData> OnResolve;
     public Action<int[]> OnPartnerGrid;
@@ -91,9 +93,10 @@ public class CoopClient : MonoBehaviour
     public void LeaveRoom()           => Send("{\"type\":\"leaveRoom\"}");
     public void SetReady(bool ready)  => Send($"{{\"type\":\"ready\",\"ready\":{(ready ? "true" : "false")}}}");
     public void StartGame()           => Send("{\"type\":\"startGame\"}");
-    public void MapSelect(int nodeId, int monsterHp, int monsterSeed, int attackInterval)
-        => Send($"{{\"type\":\"mapSelect\",\"nodeId\":{nodeId},\"monsterHp\":{monsterHp},\"monsterSeed\":{monsterSeed},\"attackInterval\":{attackInterval}}}");
+    public void MapSelect(int nodeId, bool isBattle, int monsterHp, int monsterSeed, int attackInterval)
+        => Send($"{{\"type\":\"mapSelect\",\"nodeId\":{nodeId},\"isBattle\":{(isBattle ? "true" : "false")},\"monsterHp\":{monsterHp},\"monsterSeed\":{monsterSeed},\"attackInterval\":{attackInterval}}}");
     public void MapEmote(int nodeId)  => Send($"{{\"type\":\"mapEmote\",\"nodeId\":{nodeId}}}");
+    public void SendNodeDone()        => Send("{\"type\":\"nodeDone\"}");
     public void LobbyChat(string t)   => Send($"{{\"type\":\"lobbyChat\",\"text\":\"{Esc(t)}\"}}");
     public void RoomChat(string t)    => Send($"{{\"type\":\"roomChat\",\"text\":\"{Esc(t)}\"}}");
 
@@ -170,6 +173,8 @@ public class CoopClient : MonoBehaviour
             case "goNode":      CoopSession.AttackCountdown = m.attackCountdown; OnGoNode?.Invoke(m.nodeId, m.monsterHp, m.monsterMaxHp, m.monsterSeed); break;
             case "battleEnd":   OnBattleEnd?.Invoke(m.nodeId); break;
             case "emote":       OnMapEmote?.Invoke(m.from, m.nodeId); break;
+            case "advanceReady":   OnAdvanceReady?.Invoke(); break;
+            case "waitPartnerNode": OnWaitPartnerNode?.Invoke(); break;
             case "waitPartner": OnWaitPartner?.Invoke(); break;
             case "resolve":     OnResolve?.Invoke(new ResolveData { monsterHp = m.monsterHp, monsterMaxHp = m.monsterMaxHp, monsterDead = m.monsterDead, intent = m.intent, partnerGrid = m.partnerGrid, partnerDamage = m.partnerDamage, attackCountdown = m.attackCountdown }); break;
             case "grid":        OnPartnerGrid?.Invoke(m.partnerGrid); break;

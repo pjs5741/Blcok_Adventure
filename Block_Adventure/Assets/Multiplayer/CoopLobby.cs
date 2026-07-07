@@ -78,8 +78,8 @@ public class CoopLobby : MonoBehaviour
     void RenderRoom(CoopClient.RoomState s)
     {
         if (_roomInfo == null) return;
-        string h = string.IsNullOrEmpty(s.host) ? "-" : s.host + (s.hostReady ? " ✔" : "");
-        string g = string.IsNullOrEmpty(s.guest) ? "(대기중)" : s.guest + (s.guestReady ? " ✔" : "");
+        string h = string.IsNullOrEmpty(s.host) ? "-" : s.host + (s.hostReady ? " [준비완료]" : " [대기]");
+        string g = string.IsNullOrEmpty(s.guest) ? "(대기중)" : s.guest + (s.guestReady ? " [준비완료]" : " [대기]");
         _roomInfo.text = $"방장: {h}\n참여자: {g}";
         bool bothReady = !string.IsNullOrEmpty(s.guest) && s.hostReady && s.guestReady;
         if (_startBtn != null) _startBtn.interactable = _isHost && bothReady;
@@ -127,7 +127,8 @@ public class CoopLobby : MonoBehaviour
         // 로비 채팅(오른쪽)
         _lobbyLog = MakeChatLog(_lobbyPanel.transform, new Vector2(0.53f, 0.14f), new Vector2(0.96f, 0.88f));
         _lobbyInput = MakeInput(_lobbyPanel.transform, "메시지 입력...", new Vector2(0.53f, 0.05f), new Vector2(0.82f, 0.12f));
-        var send = UIBuilder.Button(_lobbyPanel.transform, "Send", "전송", 28, () => { _c.LobbyChat(_lobbyInput.text); _lobbyInput.text = ""; _lobbyInput.ActivateInputField(); }, new Color(0.3f,0.4f,0.55f));
+        _lobbyInput.onEndEdit.AddListener(_ => { if (EnterPressed()) SendLobbyChat(); });   // 엔터 전송
+        var send = UIBuilder.Button(_lobbyPanel.transform, "Send", "전송", 28, SendLobbyChat, new Color(0.3f,0.4f,0.55f));
         UIBuilder.SetAnchors((RectTransform)send.transform, new Vector2(0.83f, 0.05f), new Vector2(0.96f, 0.12f));
 
         var back = UIBuilder.Button(_lobbyPanel.transform, "Back", "← 타이틀", 24, OnBackToTitle, new Color(0.4f,0.3f,0.3f));
@@ -158,8 +159,28 @@ public class CoopLobby : MonoBehaviour
         // 방 채팅
         _roomLog = MakeChatLog(_roomPanel.transform, new Vector2(0.53f, 0.14f), new Vector2(0.96f, 0.86f));
         _roomInput = MakeInput(_roomPanel.transform, "메시지 입력...", new Vector2(0.53f, 0.05f), new Vector2(0.82f, 0.12f));
-        var send = UIBuilder.Button(_roomPanel.transform, "RSend", "전송", 28, () => { _c.RoomChat(_roomInput.text); _roomInput.text = ""; _roomInput.ActivateInputField(); }, new Color(0.3f,0.4f,0.55f));
+        _roomInput.onEndEdit.AddListener(_ => { if (EnterPressed()) SendRoomChat(); });   // 엔터 전송
+        var send = UIBuilder.Button(_roomPanel.transform, "RSend", "전송", 28, SendRoomChat, new Color(0.3f,0.4f,0.55f));
         UIBuilder.SetAnchors((RectTransform)send.transform, new Vector2(0.83f, 0.05f), new Vector2(0.96f, 0.12f));
+    }
+
+    //--- 2026-07-06 엔터/버튼 공용 채팅 전송
+    static bool EnterPressed() => Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+
+    void SendLobbyChat()
+    {
+        if (_lobbyInput == null || string.IsNullOrWhiteSpace(_lobbyInput.text)) return;
+        _c.LobbyChat(_lobbyInput.text);
+        _lobbyInput.text = "";
+        _lobbyInput.ActivateInputField();
+    }
+
+    void SendRoomChat()
+    {
+        if (_roomInput == null || string.IsNullOrWhiteSpace(_roomInput.text)) return;
+        _c.RoomChat(_roomInput.text);
+        _roomInput.text = "";
+        _roomInput.ActivateInputField();
     }
 
     void ToggleReady()
@@ -167,7 +188,7 @@ public class CoopLobby : MonoBehaviour
         _ready = !_ready;
         _c.SetReady(_ready);
         var t = _readyBtn.GetComponentInChildren<Text>();
-        if (t != null) t.text = _ready ? "준비 완료 ✔" : "준비";
+        if (t != null) t.text = _ready ? "준비 완료" : "준비";
     }
 
     void OnBackToTitle()
