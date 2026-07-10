@@ -7,6 +7,8 @@ public partial class BlockGrid
     //--- 2026-06-29 금 블럭(보물): 깨질 때 골드 지급. 회색(99)과 달리 줄 클리어 가능(non-gray 취급), 색매칭 X, 데미지 X.
     public const int GoldBlockID = 98;
     public const int GoldBlockValue = 6;   // 금 블럭 1개당 골드
+    //--- 2026-07-09 시한폭탄 블록: 줄 클리어 가능(non-gray 취급), 색매칭 X, 데미지 X. N턴 내 제거 못 하면 폭발(주변 회색화).
+    public const int TimeBombID = 97;
 
     public void ConvertRandomBlocksToGray(int count)
     {
@@ -16,7 +18,7 @@ public partial class BlockGrid
                 if (data.gridArray[x, y] != null)
                 {
                     BlockColor bc = data.gridArray[x, y].GetComponent<BlockColor>();
-                    if (bc != null && bc.colorID != 99 && bc.colorID != GoldBlockID)   // 회색·금 블럭은 변환 대상 제외
+                    if (bc != null && bc.colorID != 99 && bc.colorID != GoldBlockID && bc.colorID != TimeBombID)   // 회색·금·시한폭탄은 변환 대상 제외
                         candidates.Add(new Vector2Int(x, y));
                 }
 
@@ -115,20 +117,14 @@ public partial class BlockGrid
                 float colorBlockDamage = 0f;
                 float lineBlockDamage = 0f;
 
+                //--- 2026-07-09 색매칭/줄클리어에 복붙돼 있던 동일 스위치문 → TallyIcon 헬퍼로 통합 (리팩토링)
+                // 금 블럭도 두 경로 모두 데미지 X로 통일 (기존엔 색매칭 경로에서만 default로 데미지가 들어갈 수 있었음)
                 // 색깔 매칭 블록 — 풀 효과
                 foreach (Transform block in matchBlocks)
                 {
                     int icon = GetColorID(block);
                     AddCount(ctx.iconMatchCounts, icon);
-                    switch (icon)
-                    {
-                        case 1: colorBlockDamage += perBlock; break;           // 칼
-                        case 2: burnFromColor++; break;                         // 화염 (화상 스택)
-                        case 3: poisonFromColor++; break;                       // 독약
-                        case 4: shieldFromColor++; break;                       // 방패
-                        case 5: /* 폭탄: AoE는 별도 처리 */ break;
-                        default: colorBlockDamage += perBlock; break;
-                    }
+                    colorBlockDamage += TallyIcon(icon, perBlock, ref burnFromColor, ref poisonFromColor, ref shieldFromColor);
                 }
 
                 // 줄 클리어 전용 블록 (색깔 매칭 미포함) — 감소 효과
@@ -139,16 +135,7 @@ public partial class BlockGrid
                 {
                     int icon = GetColorID(block);
                     AddCount(ctx.iconMatchCounts, icon);
-                    switch (icon)
-                    {
-                        case 1: lineBlockDamage += perBlock; break;
-                        case 2: burnFromLine++; break;
-                        case 3: poisonFromLine++; break;
-                        case 4: shieldFromLine++; break;
-                        case 5: /* 폭탄 */ break;
-                        case GoldBlockID: break;   // 금 블럭: 데미지 X (골드는 파괴 시 지급)
-                        default: lineBlockDamage += perBlock; break;
-                    }
+                    lineBlockDamage += TallyIcon(icon, perBlock, ref burnFromLine, ref poisonFromLine, ref shieldFromLine);
                 }
 
                 // 줄 데미지에 라인 배율 적용
@@ -174,6 +161,18 @@ public partial class BlockGrid
 
                 Debug.Log($"{comboCount}콤보 | 줄{ctx.lineClearCount}({ctx.lineMultiplier:F1}배) | 색매칭 {matchBlocks.Count}개 | 합 데미지 ~{totalBaseDamage:F0} | 방패 {totalShield} 독 {totalPoison} 화상 {totalBurn}");
 
+                //--- 2026-07-09 컨텍스트 튜토리얼: 첫 색매칭/첫 줄클리어 "터지는 순간" 일시정지 + 해당 위치 스포트라이트
+                if (matchBlocks.Count > 0 && !ContextTutorial.WasShown("match"))
+                    ContextTutorial.Show("match", Centroid(matchBlocks), 2.2f, "색깔 매칭!",
+                        $"같은 색깔 블록을 {playerStats.matchThreshold}개 이상 붙이면 터집니다.\n터진 뒤엔 모든 블록이 빈칸 없이 아래로 떨어져요.");
+                if (ctx.lineClearCount > 0 && !ContextTutorial.WasShown("lineclear"))
+                {
+                    int clearY = 0;
+                    for (int y = 0; y < data.height; y++) if (IsLineClearable(y)) { clearY = y; break; }
+                    ContextTutorial.Show("lineclear", new Vector3((data.width - 1) / 2f, clearY, 0f), 3.2f, "줄 클리어!",
+                        "가로 한 줄을 꽉 채우면 줄 전체가 지워집니다.\n회색 블록도 이 방법으로 같이 지울 수 있어요.");
+                }
+
                 foreach (Transform t in allToDestroy)
                 {
                     if (t == null) continue;
@@ -188,7 +187,8 @@ public partial class BlockGrid
                     StartCoroutine(AnimateAndDestroy(t));
                 }
 
-                if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(Tuning.BlockDestroyShakeStrength, Tuning.BlockDestroyShakeDuration);
+                //--- 2026-07-09 TriggerShake(duration, magnitude) 시그니처인데 (강도, 시간) 순서로 넘기던 버그 수정
+                if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(Tuning.BlockDestroyShakeDuration, Tuning.BlockDestroyShakeStrength);
                 yield return new WaitForSeconds(destroyDuration + 0.05f);
 
                 //--- 2026-06-30 블록 깨진 뒤 공격. 협동은 공격 연출을 resolve(둘 다 조작 후)로 미룸 → 여기선 데미지만 계산+디버프 적용.
@@ -269,6 +269,23 @@ public partial class BlockGrid
         dict[key]++;
     }
 
+    //--- 2026-07-09 아이콘별 효과 집계 단일 소스 (색매칭/줄클리어 공용, 스위치문 중복 제거)
+    // 반환 = 데미지 기여분. 디버프(화상/독/방패)는 ref 카운트로 누적. 폭탄=AoE 별도, 금=골드 별도(데미지 X).
+    static float TallyIcon(int icon, float perBlock, ref int burn, ref int poison, ref int shield)
+    {
+        switch (icon)
+        {
+            case 1: return perBlock;        // 칼
+            case 2: burn++; return 0f;      // 화염 (화상 스택)
+            case 3: poison++; return 0f;    // 독약
+            case 4: shield++; return 0f;    // 방패
+            case 5: return 0f;              // 폭탄: AoE는 별도 처리
+            case GoldBlockID: return 0f;    // 금 블럭: 데미지 X (골드는 파괴 시 지급)
+            case TimeBombID: return 0f;     //--- 2026-07-09 시한폭탄: 제거해도 데미지 X (해체가 목적)
+            default: return perBlock;
+        }
+    }
+
 
     HashSet<Transform> GetLineClearBlocks()
     {
@@ -302,7 +319,8 @@ public partial class BlockGrid
                 if (data.gridArray[x, y] == null || visited[x, y]) continue;
 
                 int startColor = GetColorID(data.gridArray[x, y]);
-                if (startColor == 0 || startColor == 99 || startColor == GoldBlockID) continue;   // 금 블럭은 색매칭 X
+                if (startColor == 0 || startColor == 99 || startColor == GoldBlockID || startColor == TimeBombID) continue;   // 금·시한폭탄은 색매칭 X
+                if (IsFrozenBlock(data.gridArray[x, y])) continue;   //--- 2026-07-09 빙결 블록은 매칭 시작점 불가
 
                 List<Transform> currentGroup = new List<Transform>();
                 Queue<Vector2Int> queue = new Queue<Vector2Int>();
@@ -321,6 +339,7 @@ public partial class BlockGrid
                         if (!IsValidIndex(nx, ny)) continue;
                         if (visited[nx, ny] || data.gridArray[nx, ny] == null) continue;
                         if (GetColorID(data.gridArray[nx, ny]) != startColor) continue;
+                        if (IsFrozenBlock(data.gridArray[nx, ny])) continue;   //--- 2026-07-09 빙결 블록은 매칭 연결 불가(줄클리어로만 제거)
 
                         visited[nx, ny] = true;
                         queue.Enqueue(new Vector2Int(nx, ny));
@@ -352,5 +371,20 @@ public partial class BlockGrid
         BlockColor info = block.GetComponent<BlockColor>();
         if (info != null) return info.colorID;
         return 0;
+    }
+
+    //--- 2026-07-09 [얼림] 빙결 여부 — 매칭 플러드필 제외 판정용
+    static bool IsFrozenBlock(Transform block)
+    {
+        var bc = block.GetComponent<BlockColor>();
+        return bc != null && bc.IsFrozen;
+    }
+
+    //--- 2026-07-09 블록 그룹 중심 좌표 (컨텍스트 튜토리얼 스포트라이트용)
+    static Vector3 Centroid(HashSet<Transform> blocks)
+    {
+        Vector3 sum = Vector3.zero; int n = 0;
+        foreach (var t in blocks) { if (t == null) continue; sum += t.position; n++; }
+        return n > 0 ? sum / n : Vector3.zero;
     }
 }

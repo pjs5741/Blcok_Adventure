@@ -3,7 +3,8 @@ using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 
-public enum MonsterIntent { RowAttack, ConvertBlocks, Blind, GravityShift, GravityShiftRight, Pivot, SelfCleanse, Dispel }
+//--- 2026-07-09 Freeze(얼림)/TimeBomb(시한폭탄) 추가
+public enum MonsterIntent { RowAttack, ConvertBlocks, Blind, GravityShift, GravityShiftRight, Pivot, SelfCleanse, Dispel, Freeze, TimeBomb }
 
 public class Monster : MonoBehaviour
 {
@@ -27,6 +28,10 @@ public class Monster : MonoBehaviour
     protected int attackInterval = 3;   // 일반 3 / 엘리트 2 / 보스 1
     protected int _attackCountdown = 3; // 다음 공격까지 남은 턴
     int[] _intentCooldown;
+    //--- 2026-07-09 광폭화(보스 페이즈): 체력 EnrageHpRatio 이하 최초 1회 발동 → 이후 줄추가가 EnrageRows개
+    protected bool _canEnrage;          // 프로필에서 주입 (보스만)
+    protected bool _enraged;
+    public bool IsEnraged => _enraged;
 
     [Header("보상 블록")]
     [SerializeField] protected List<GameObject> rewardPool = new List<GameObject>();
@@ -37,7 +42,9 @@ public class Monster : MonoBehaviour
     [SerializeField] protected Slider hpSlider;
     protected SpriteRenderer spriteRenderer;
     Animator animator;
+    PivotActor _pivotActor;   //--- 2026-07-09 점프 가격 연출용 (extraOffset 구동)
     [SerializeField] protected string attackStateName = "Basic_Attack";   //--- 공격 애니 상태명(애니 변경 시 인스펙터 수정)
+    [SerializeField] protected string castStateName = "Cast_Attack";      //--- 2026-07-09 특수패턴(판조작) 시전 애니 상태명(클립은 리소스 작업 때)
 
     public MonsterIntent CurrentIntent { get; private set; }
     //--- 2026-06-30 인텐트를 텍스트 → 이미지(임시 무지개 placeholder) + 호버 툴팁(효과 설명)으로 변경
@@ -53,7 +60,8 @@ public class Monster : MonoBehaviour
         spriteRenderer = GetComponent<SpriteRenderer>();
         animator = GetComponent<Animator>();
         //--- 2026-06-26 피벗 연출 중 카메라 휩쓸림 방지 + 뒤집은 후 간격 유지용 헬퍼 부착
-        if (GetComponent<PivotActor>() == null) gameObject.AddComponent<PivotActor>();
+        _pivotActor = GetComponent<PivotActor>();
+        if (_pivotActor == null) _pivotActor = gameObject.AddComponent<PivotActor>();
         SetupIntentIcon();
         ApplyNodeProfile();   // 현재 노드 타입에 맞는 몬스터 프로필 적용 (HP/색/패턴풀)
         Init();
@@ -76,6 +84,7 @@ public class Monster : MonoBehaviour
         _rewardShapes = p.rewardShapes;
         _baseColor = p.tint;
         attackInterval = Mathf.Max(1, p.attackInterval);   //--- 2026-07-03 공격 주기
+        _canEnrage = p.enrage;   //--- 2026-07-09 광폭화 가능 여부(보스)
         if (spriteRenderer != null) spriteRenderer.color = _baseColor;
         if (!string.IsNullOrEmpty(p.name)) gameObject.name = p.name;
     }
@@ -360,6 +369,9 @@ public class Monster : MonoBehaviour
         if (intentTip == null) return;
         intentTip.title = IntentTitle(CurrentIntent);
         intentTip.body = IntentDesc(CurrentIntent);
+        //--- 2026-07-09 광폭화 중 줄추가는 개수 강화 안내
+        if (_enraged && CurrentIntent == MonsterIntent.RowAttack)
+            intentTip.body = $"광폭화! 바닥에 회색 줄을 {Tuning.EnrageRows}개 추가한다.";
     }
 
     static string IntentTitle(MonsterIntent intent) => intent switch
@@ -372,6 +384,8 @@ public class Monster : MonoBehaviour
         MonsterIntent.Pivot            => "판 회전",
         MonsterIntent.SelfCleanse      => "정화",
         MonsterIntent.Dispel           => "디스펠",
+        MonsterIntent.Freeze           => "얼림",
+        MonsterIntent.TimeBomb         => "시한폭탄",
         _ => "?"
     };
 
@@ -385,6 +399,8 @@ public class Monster : MonoBehaviour
         MonsterIntent.Pivot            => "판을 90도 회전시킨다.",
         MonsterIntent.SelfCleanse      => "자신의 독·화상을 모두 제거한다.",
         MonsterIntent.Dispel           => "플레이어의 버프(방패·공격 버프)를 모두 제거한다.",
+        MonsterIntent.Freeze           => $"블록 {Tuning.FreezeCount}개를 얼린다. 언 블록은 색깔 매칭이 안 되고, 줄 클리어로만 지울 수 있다. {Tuning.FreezeTurns}턴 뒤 녹는다.",
+        MonsterIntent.TimeBomb         => $"판에 시한폭탄을 설치한다. {Tuning.TimeBombTurns}턴 안에 줄 클리어 등으로 없애지 못하면 터져서 주변이 회색이 된다.",
         _ => ""
     };
 
@@ -407,6 +423,42 @@ public class Monster : MonoBehaviour
         {
             Die();
         }
+        //--- 2026-07-09 광폭화: 체력 비율 최초 통과 시 1회 발동
+        else if (_canEnrage && !_enraged && currentHp <= maxHp * Tuning.EnrageHpRatio)
+        {
+            StartCoroutine(EnrageRoutine());
+        }
+    }
+
+    //--- 2026-07-09 광폭화 연출: 셰이크 + 붉은 틴트 + 크기 업. 이후 줄추가가 EnrageRows개(AttackCoroutine).
+    IEnumerator EnrageRoutine()
+    {
+        _enraged = true;
+        var fx = FxTuning.I;
+        Debug.Log($"😡 {gameObject.name} 광폭화! (체력 {Tuning.EnrageHpRatio:P0} 이하)");
+        if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(fx.enrageShakeDuration, fx.enrageShakeStrength);
+
+        // 피격 연출(빨간 깜빡)이 끝난 뒤 기본색을 광폭화 색으로 전환 (HitEffect가 _baseColor로 복귀시키므로 기본색 자체를 바꿈)
+        yield return new WaitWhile(() => _hitting);
+        Color from = _baseColor;
+        Color to = Color.Lerp(_baseColor, fx.enrageTint, fx.enrageTintStrength);
+        Vector3 s0 = transform.localScale, s1 = s0 * fx.enrageScale;
+
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / Mathf.Max(fx.enrageDuration, 0.01f);
+            float lin = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t));
+            _baseColor = Color.Lerp(from, to, lin);   // 독 펄스/피격 복귀도 이 색 기준
+            if (!_hitting && spriteRenderer != null && _poisonStacks <= 0) spriteRenderer.color = _baseColor;
+            transform.localScale = Vector3.Lerp(s0, s1, lin);
+            yield return null;
+        }
+        _baseColor = to;
+        transform.localScale = s1;
+
+        // 인텐트 툴팁에 광폭화 반영
+        RefreshIntent();
     }
 
     // 사망 처리 (virtual)
@@ -448,7 +500,14 @@ public class Monster : MonoBehaviour
 
     //--- 2026-07-01 협동: 공유 몬스터 HP를 서버 권위값으로 동기화
     public float CurrentHp => currentHp;
-    public void SetHp(float hp) { currentHp = Mathf.Clamp(hp, 0f, maxHp); }      // HP바는 Update()에서 보간
+    public float MaxHp => maxHp;   //--- 2026-07-09 강공격(넉백급 데미지) 판정용
+    public void SetHp(float hp)
+    {
+        currentHp = Mathf.Clamp(hp, 0f, maxHp);   // HP바는 Update()에서 보간
+        //--- 2026-07-09 협동: 서버 권위값 반영으로 광폭화 임계를 지나친 경우도 발동 (TakeDamage 크로싱 놓침 방지)
+        if (_canEnrage && !_enraged && !isDead && currentHp > 0f && currentHp <= maxHp * Tuning.EnrageHpRatio)
+            StartCoroutine(EnrageRoutine());
+    }
     public void SetMaxHp(float hp) { maxHp = Mathf.Max(1f, hp); currentHp = maxHp; UpdateUI(); }
 
     // 공통 피격 연출 (빨갛게 깜빡)
@@ -466,20 +525,37 @@ public class Monster : MonoBehaviour
     
     public virtual IEnumerator AttackCoroutine()
     {
-        animator.SetTrigger("basicAttack");
+        //--- 2026-07-09 판 회전은 전용 연출: 점프해서 그리드 상단을 가격하고 착지 → 그다음 판이 삐걱→넘어짐(ApplyPivot 내부).
+        // 그 외 인텐트는 기존 제자리 공격 모션.
+        if (CurrentIntent == MonsterIntent.Pivot)
+        {
+            yield return JumpStrikeRoutine();
+            GameManager.Instance.blockGrid.ApplyPivot(3);
+            PickIntent();
+            yield break;
+        }
+
+        //--- 2026-07-09 모션 2분화: 물리 공격(줄추가/회색화)=기본공격, 판 조작(중력/은폐/얼림/폭탄/디스펠/정화)=시전(Cast) 모션.
+        // 시전 클립(castAttack)이 아직 없으면 기본공격 폴백.
+        bool cast = IsCastIntent(CurrentIntent) && AnimHelper.TriggerOrFallback(animator, "castAttack", "basicAttack");
+        if (!IsCastIntent(CurrentIntent)) animator.SetTrigger("basicAttack");
+        string waitState = cast ? castStateName : attackStateName;
 
         float guard = 0f;
         yield return new WaitUntil(() =>
         {
             guard += Time.deltaTime;
             var state = animator.GetCurrentAnimatorStateInfo(0);
-            return (state.IsName(attackStateName) && state.normalizedTime >= 0.5f) || guard > Tuning.AttackMaxWait;
+            return (state.IsName(waitState) && state.normalizedTime >= 0.5f) || guard > Tuning.AttackMaxWait;
         });
 
         switch (CurrentIntent)
         {
             case MonsterIntent.RowAttack:
-                GameManager.Instance.blockGrid.ShiftAndCreateRow(99, Color.gray);
+                //--- 2026-07-09 광폭화 상태면 줄을 여러 개 추가
+                int rows = _enraged ? Tuning.EnrageRows : 1;
+                for (int i = 0; i < rows; i++)
+                    GameManager.Instance.blockGrid.ShiftAndCreateRow(99, Color.gray);
                 break;
             case MonsterIntent.ConvertBlocks:
                 GameManager.Instance.blockGrid.ConvertRandomBlocksToGray(3);
@@ -493,9 +569,10 @@ public class Monster : MonoBehaviour
             case MonsterIntent.GravityShiftRight:
                 GameManager.Instance.blockGrid.ApplyGravityShift(false);
                 break;
-            case MonsterIntent.Pivot:
-                GameManager.Instance.blockGrid.ApplyPivot(3);
-                break;
+            //--- 2026-07-09 Pivot은 위의 전용 연출 분기로 이동
+            // case MonsterIntent.Pivot:
+            //     GameManager.Instance.blockGrid.ApplyPivot(3);
+            //     break;
             case MonsterIntent.SelfCleanse:
                 CleanseSelf();
                 break;
@@ -503,9 +580,74 @@ public class Monster : MonoBehaviour
                 if (Run.IsInitialized) { Run.stats.shieldStacks = 0; Run.stats.buffAttack = 0f; }
                 Debug.Log($"✖ {gameObject.name} 디스펠 → 플레이어 버프 제거");
                 break;
+            //--- 2026-07-09 신규 패턴
+            case MonsterIntent.Freeze:
+                GameManager.Instance.blockGrid.ApplyFreeze(Tuning.FreezeCount, Tuning.FreezeTurns);
+                break;
+            case MonsterIntent.TimeBomb:
+                GameManager.Instance.blockGrid.ApplyTimeBomb(Tuning.TimeBombTurns);
+                break;
         }
 
         PickIntent();
+    }
+
+    //--- 2026-07-09 모션 분류: 몸으로 때리는 패턴=기본공격, 판을 조작하는 패턴=시전(Cast)
+    static bool IsCastIntent(MonsterIntent intent) => intent switch
+    {
+        MonsterIntent.RowAttack => false,
+        MonsterIntent.ConvertBlocks => false,
+        MonsterIntent.Pivot => false,   // 피벗은 점프 가격(별도 연출)
+        _ => true   // Blind, GravityShift×2, SelfCleanse, Dispel, Freeze, TimeBomb
+    };
+
+    //--- 2026-07-09 [피벗 전용 연출] 포물선 점프로 그리드 우상단 타격 지점까지 → 공중 가격(기존 공격 모션 재생) → 착지 복귀.
+    // 위치는 PivotActor.extraOffset으로 구동(직접 transform 이동은 PivotActor.LateUpdate가 덮어씀).
+    // 전용 점프킥 애니 클립은 막판 리소스 작업 때 교체.
+    IEnumerator JumpStrikeRoutine()
+    {
+        var fx = FxTuning.I;
+        var grid = GameManager.Instance != null ? GameManager.Instance.blockGrid : null;
+
+        // 타격 지점: 그리드 우상단 모서리 + 오프셋 (그리드 없으면 제자리 공격 폴백)
+        Vector3 disp = Vector3.zero;
+        if (grid != null)
+        {
+            Vector3 strikePos = new Vector3(
+                grid.data.width - 1 + fx.lungeTargetOffset.x,
+                grid.data.height - 1 + fx.lungeTargetOffset.y, transform.position.z);
+            disp = strikePos - transform.position;
+        }
+
+        yield return HopOffset(Vector3.zero, disp, fx.lungeDuration, fx.lungeArc);   // 점프해 들어감
+
+        animator.SetTrigger("basicAttack");   // 공중 가격 (임시: 기본 공격 모션)
+        float guard = 0f;
+        yield return new WaitUntil(() =>
+        {
+            guard += Time.deltaTime;
+            var state = animator.GetCurrentAnimatorStateInfo(0);
+            return (state.IsName(attackStateName) && state.normalizedTime >= 0.5f) || guard > Tuning.AttackMaxWait;
+        });
+
+        yield return HopOffset(disp, Vector3.zero, fx.lungeDuration, fx.lungeArc);   // 착지 복귀
+    }
+
+    // extraOffset을 a→b 포물선으로 보간 (arc = 추가 높이)
+    IEnumerator HopOffset(Vector3 a, Vector3 b, float duration, float arc)
+    {
+        if (_pivotActor == null) yield break;
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / Mathf.Max(duration, 0.01f);
+            float lin = Mathf.Clamp01(t);
+            Vector3 d = Vector3.Lerp(a, b, Mathf.SmoothStep(0f, 1f, lin));
+            d.y += arc * 4f * lin * (1f - lin);   // 포물선: 중간 지점 정점
+            _pivotActor.extraOffset = d;
+            yield return null;
+        }
+        _pivotActor.extraOffset = b;
     }
 
     public void Hit(float fDamage)

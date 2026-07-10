@@ -8,8 +8,11 @@ public class BattleManager : MonoBehaviour
     public Player player;
 
     [Header("연출")]
-    public float monsterTelegraph = Tuning.MonsterTelegraph;   //--- 몬스터 공격 전 예고 멈춤(초)
+    //--- 2026-07-09 직렬화 필드는 씬에 저장된 옛 값이 Tuning 기본값을 덮어씀(pivotDuration과 동일 문제) → 프로퍼티로 고정 (리팩토링)
+    // public float monsterTelegraph = Tuning.MonsterTelegraph;   //--- 몬스터 공격 전 예고 멈춤(초)
+    public float monsterTelegraph => Tuning.MonsterTelegraph;     //--- 몬스터 공격 전 예고 멈춤(초)
     public string playerAttackState = "Player_BasicAttack";    //--- 플레이어 공격 애니 상태명(애니 변경 시 인스펙터에서 수정)
+    public string playerHeavyAttackState = "Player_HeavyAttack";   //--- 2026-07-09 강공격 상태명(클립은 리소스 작업 때)
 
     void Awake()
     {
@@ -26,10 +29,13 @@ public class BattleManager : MonoBehaviour
 
         IconEffects.Apply(ctx, currentMonster);
 
-        player.Attack();
-        yield return WaitAnimDone(player.animator, playerAttackState);   // 공격 모션 끝까지
-
         float finalDamage = player.stats.EffectiveDamage * ctx.damageMultiplier;
+
+        //--- 2026-07-09 공격 2분화: 넉백급 데미지(몬스터 넉백 조건과 동일 기준)면 강공격 모션 → "쌔게 휘두름↔몬스터 날아감" 항상 한 쌍
+        bool heavy = HasLivingMonster() && finalDamage >= currentMonster.MaxHp * Tuning.HitKnockbackRatio;
+        bool heavyPlayed = player.Attack(heavy);   // 강공격 클립 없으면 기본공격 폴백(false)
+        yield return WaitAnimDone(player.animator, heavyPlayed ? playerHeavyAttackState : playerAttackState);   // 공격 모션 끝까지
+
         if (finalDamage > 0 && HasLivingMonster())
             currentMonster.TakeDamage(finalDamage);
 
@@ -63,10 +69,12 @@ public class BattleManager : MonoBehaviour
         if (!HasLivingMonster()) yield break;
 
         //--- 2026-07-01 무한 대기 방지: 플레이어 공격 상태가 안 끝나도 가드 시간 지나면 통과
+        //--- 2026-07-09 강공격 상태도 대기 대상에 포함
         float exitGuard = 0f;
         yield return new WaitUntil(() =>
             (exitGuard += Time.deltaTime) > Tuning.AnimWaitGuard ||
-            !player.animator.GetCurrentAnimatorStateInfo(0).IsName("Player_BasicAttack"));
+            (!player.animator.GetCurrentAnimatorStateInfo(0).IsName(playerAttackState) &&
+             !player.animator.GetCurrentAnimatorStateInfo(0).IsName(playerHeavyAttackState)));
 
         //--- 2026-06-30 공격 예고(텔레그래프) — 인텐트 보고 대비할 틈. 너무 빨리 때리던 문제
         yield return new WaitForSeconds(monsterTelegraph);

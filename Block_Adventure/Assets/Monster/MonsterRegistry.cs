@@ -40,7 +40,8 @@ public static class MonsterRegistry
             name = "골렘", maxHp = 900, goldReward = 50, tint = new Color(0.6f, 0.6f, 0.65f),
             intentPool = new[] { MonsterIntent.RowAttack, MonsterIntent.RowAttack,
                                  MonsterIntent.GravityShift, MonsterIntent.GravityShiftRight,
-                                 MonsterIntent.Dispel, MonsterIntent.SelfCleanse },   // 버프 견제
+                                 MonsterIntent.Dispel, MonsterIntent.SelfCleanse,
+                                 MonsterIntent.Freeze },   //--- 2026-07-09 얼림(매칭 방해) 추가
             rewardShapes = EliteShapes,
             attackInterval = 2   // 엘리트: 2턴마다 공격
         },
@@ -52,9 +53,11 @@ public static class MonsterRegistry
             name = "보스", maxHp = 1600, goldReward = 100, tint = new Color(0.9f, 0.3f, 0.3f),
             intentPool = new[] { MonsterIntent.RowAttack, MonsterIntent.RowAttack,
                                  MonsterIntent.Pivot, MonsterIntent.ConvertBlocks,
-                                 MonsterIntent.Dispel },   // 플레이어 버프 견제
+                                 MonsterIntent.Dispel,
+                                 MonsterIntent.TimeBomb },   //--- 2026-07-09 시한폭탄 추가
             rewardShapes = BossShapes,
-            attackInterval = 1   // 보스: 매 턴 공격
+            attackInterval = 1,  // 보스: 매 턴 공격
+            enrage = true        //--- 2026-07-09 체력 50% 이하 광폭화(줄추가 2개)
         },
     };
 

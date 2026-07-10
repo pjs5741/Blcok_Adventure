@@ -18,4 +18,5 @@ public class MonsterProfile
     public MonsterIntent[] intentPool;   // 가중치는 중복으로 표현 (줄추가 여러 개 = 높은 빈도)
     public ShapeDrop[] rewardShapes;     // 보상 카드 모양 드랍 가중치 (null이면 기본 풀)
     public int attackInterval = 3;       //--- 2026-07-03 공격 주기(턴). 일반 3 / 엘리트 2 / 보스 1
+    public bool enrage;                  //--- 2026-07-09 광폭화(체력 50% 이하 1회: 줄추가 강화) — 보스용
 }

@@ -20,6 +20,7 @@ public class TooltipUI : MonoBehaviour
     }
 
     RectTransform _panel;
+    Canvas _canvas;   //--- 2026-07-10 scaleFactor 보정용
     Text _title, _body;
     bool _visible;
 
@@ -41,6 +42,7 @@ public class TooltipUI : MonoBehaviour
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 30000;   // 항상 최상위
         UIScale.Configure(canvasGO.GetComponent<CanvasScaler>());   //--- 2026-07-03 해상도 스케일 통일
+        _canvas = canvas;
 
         var panelGO = new GameObject("Panel", typeof(RectTransform), typeof(Image),
             typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
@@ -109,12 +111,17 @@ public class TooltipUI : MonoBehaviour
 
     void PositionAtMouse()
     {
-        Vector2 m = Input.mousePosition;
+        //--- 2026-07-10 CanvasScaler 사용 시 anchoredPosition은 "캔버스 단위"인데 마우스는 "스크린 픽셀"이라
+        // 해상도가 1920x1080이 아니면 scaleFactor만큼 어긋나(마우스에서 멀어짐) → 스케일로 나눠 보정
+        float sf = (_canvas != null && _canvas.scaleFactor > 0f) ? _canvas.scaleFactor : 1f;
+        Vector2 m = (Vector2)Input.mousePosition / sf;
+        float screenW = Screen.width / sf, screenH = Screen.height / sf;
+
         Vector2 pos = m + new Vector2(16f, -16f);
         float w = _panel.rect.width, h = _panel.rect.height;
         // 화면 밖으로 안 나가게 클램프 (pivot 좌상단 기준: 패널은 [x, x+w] x [y-h, y] 차지)
-        float x = Mathf.Clamp(pos.x, 0f, Mathf.Max(0f, Screen.width - w));
-        float y = Mathf.Clamp(pos.y, h, Screen.height);
-        _panel.anchoredPosition = new Vector2(x, y);   // 앵커 좌하단(0,0) 기준 스크린 픽셀
+        float x = Mathf.Clamp(pos.x, 0f, Mathf.Max(0f, screenW - w));
+        float y = Mathf.Clamp(pos.y, h, screenH);
+        _panel.anchoredPosition = new Vector2(x, y);   // 앵커 좌하단(0,0) 기준, 캔버스 단위
     }
 }

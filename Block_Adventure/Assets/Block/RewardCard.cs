@@ -31,7 +31,11 @@ public class RewardCard : MonoBehaviour
     {
         _blockPrefab = prefab;
         _colorID = colorID;
-        if (blockNameText != null) blockNameText.text = "";
+        //--- 2026-07-10 프리팹 잔재 텍스트("Block_Z" 흰 글씨)가 카드에 비쳐 보이던 문제.
+        // 카드가 비활성일 때 Setup이 돌면 OnEnable이 아직 참조를 못 잡아 text=""가 스킵됨 → 강제 탐색 후 오브젝트 자체를 끔
+        // if (blockNameText != null) blockNameText.text = "";
+        if (blockNameText == null) blockNameText = GetComponentInChildren<Text>(true);
+        if (blockNameText != null) blockNameText.gameObject.SetActive(false);
 
         BuildUI();
 
@@ -53,14 +57,14 @@ public class RewardCard : MonoBehaviour
         if (_descName != null) return;
 
         // 블록 모양 영역 (설명칸 위쪽, 겹치지 않게 분리)
-        var artGO = NewUI("Art", transform, typeof(RectTransform));
+        var artGO = UIBuilder.NewUI("Art", transform, typeof(RectTransform));
         _artHost = (RectTransform)artGO.transform;
         _artHost.anchorMin = new Vector2(0.12f, 0.42f);
         _artHost.anchorMax = new Vector2(0.88f, 0.95f);
         _artHost.offsetMin = Vector2.zero; _artHost.offsetMax = Vector2.zero;
 
         // 설명칸 배경 (하단)
-        var box = NewUI("DescBox", transform, typeof(RectTransform), typeof(Image));
+        var box = UIBuilder.NewUI("DescBox", transform, typeof(RectTransform), typeof(Image));
         var boxRt = (RectTransform)box.transform;
         boxRt.anchorMin = new Vector2(0.06f, 0.04f);
         boxRt.anchorMax = new Vector2(0.94f, 0.34f);
@@ -68,7 +72,7 @@ public class RewardCard : MonoBehaviour
         box.GetComponent<Image>().color = new Color(0.08f, 0.09f, 0.13f, 0.95f);
 
         // 효과 이름 (설명칸 전체 폭 — 아이콘 이미지 제거)
-        var nameGO = NewUI("EffectName", box.transform, typeof(RectTransform), typeof(Text));
+        var nameGO = UIBuilder.NewUI("EffectName", box.transform, typeof(RectTransform), typeof(Text));
         var nameRt = (RectTransform)nameGO.transform;
         nameRt.anchorMin = Vector2.zero; nameRt.anchorMax = Vector2.one;
         nameRt.offsetMin = Vector2.zero; nameRt.offsetMax = Vector2.zero;
@@ -81,13 +85,14 @@ public class RewardCard : MonoBehaviour
         _descName.raycastTarget = false;
     }
 
-    GameObject NewUI(string name, Transform parent, params System.Type[] comps)
-    {
-        var go = new GameObject(name, comps);
-        go.layer = LayerMask.NameToLayer("UI");
-        go.transform.SetParent(parent, false);
-        return go;
-    }
+    //--- 2026-07-09 UIBuilder.NewUI와 완전 중복이라 공용 헬퍼로 통합 (리팩토링)
+    // GameObject NewUI(string name, Transform parent, params System.Type[] comps)
+    // {
+    //     var go = new GameObject(name, comps);
+    //     go.layer = LayerMask.NameToLayer("UI");
+    //     go.transform.SetParent(parent, false);
+    //     return go;
+    // }
 
     void Update()
     {

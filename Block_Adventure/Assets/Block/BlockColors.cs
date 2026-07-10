@@ -7,6 +7,7 @@ public static class BlockColors
 {
     public const int Gold = 98;
     public const int Gray = 99;
+    public const int TimeBomb = 97;   //--- 2026-07-09 시한폭탄 (몬스터 패턴)
     public const int MinEffect = 1, MaxEffect = 5;   // 카드/스폰에 쓰이는 효과 색 범위
 
     public static Color Get(int id)
@@ -20,6 +21,7 @@ public static class BlockColors
             case 5: return new Color(0.3f, 0.2f, 0.1f);      // 폭탄 — 어두운 갈색
             case Gold: return new Color(1f, 0.84f, 0f);      // 금 블럭 — 노랑
             case Gray: return Color.gray;                     // garbage
+            case TimeBomb: return new Color(0.55f, 0.1f, 0.12f);   //--- 2026-07-09 시한폭탄 — 어두운 빨강 (파트너 미니뷰 등)
             default: return Color.white;
         }
     }

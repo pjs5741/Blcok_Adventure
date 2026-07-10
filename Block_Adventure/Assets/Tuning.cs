@@ -3,14 +3,23 @@
 public static class Tuning
 {
     // 연출 타이밍(초)
-    public const float PivotDuration = 0.6f;          // 판 90도 회전
-    public const float DodgeDuration = 0.6f;          // 플레이어 회피 점프
+    //--- 2026-07-09 연출(느낌) 값은 FxTuning.asset(ScriptableObject)으로 이동 — 에디터 커브 + 실시간 튜닝.
+    // public const float PivotDuration = 0.6f;          // 판 90도 회전 → FxTuning.pivotDuration
+    // public const float DodgeDuration = 0.6f;          // 플레이어 회피 점프 → FxTuning.dodgeDuration
     public const float MonsterTelegraph = 0.55f;      // 몬스터 공격 예고 멈춤
     public const float RewardRotateInterval = 1.0f;   // 보상 카드 90도 회전 간격
     public const float RewardArtYOffset = 1.7f;        //--- 2026-07-01 보상 카드 블록 아트 Y 위치(하단 설명칸 침범 방지)
     public const float DotTickPause = 0.35f;          // 도트(독/화상) 틱 사이 멈춤
     public const float AnimWaitGuard = 1.0f;          // 애니 상태 진입 대기 안전 가드(무한대기 방지)
     public const float AttackMaxWait = 2.0f;          // 공격 모션 대기 상한(무한대기 방지)
+
+    //--- 2026-07-09 신규 몬스터 패턴 밸런스 (연출 값은 FxTuning으로)
+    public const int FreezeCount = 4;                  // 얼림: 한 번에 어는 블록 수
+    public const int FreezeTurns = 2;                  // 얼림: 해동까지 턴 수
+    public const int TimeBombTurns = 3;                // 시한폭탄: 폭발까지 턴 수
+    public const int TimeBombRadius = 1;               // 시한폭탄: 폭발 반경(1=3x3)
+    public const float EnrageHpRatio = 0.5f;           // 광폭화 발동 체력 비율
+    public const int EnrageRows = 2;                   // 광폭화 후 줄 추가 개수
 
     // 밸런스
     public const int DotStacksPerBlock = 3; // 독/화상 블록 1개당 부여 스택 (틱 데미지=스택 그대로 → 직관적)

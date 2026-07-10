@@ -173,7 +173,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   blockNameText: {fileID: 0}
   rotateInterval: 1
-  artYOffset: 1.7
 --- !u!114 &114284804
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -310,7 +309,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   blockNameText: {fileID: 0}
   rotateInterval: 1
-  artYOffset: 1.7
 --- !u!114 &263805580
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1319,7 +1317,7 @@ Animator:
   m_GameObject: {fileID: 1209864161}
   m_Enabled: 1
   m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: cecf95eef497b49ee88ffe5674bb07c9, type: 2}
+  m_Controller: {fileID: 9100000, guid: 52b7fca77254f494f83fba19b12858d4, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0
@@ -1395,8 +1393,8 @@ Transform:
   m_GameObject: {fileID: 1209864161}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -10, y: 0, z: 0}
-  m_LocalScale: {x: 6, y: 6, z: 6}
+  m_LocalPosition: {x: -10, y: 1.5, z: 0}
+  m_LocalScale: {x: 4.2, y: 4.2, z: 4.2}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -1420,10 +1418,9 @@ MonoBehaviour:
     gold: 0
     chainComboBonus: 1
     glassHeartBonus: 1
+    shieldStacks: 0
+    buffAttack: 0
   animator: {fileID: 0}
-  dodgeOffset: {x: -2.5, y: 0}
-  dodgeHeight: 1.5
-  dodgeDuration: 0.6
 --- !u!114 &1209864166
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1704,7 +1701,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   blockNameText: {fileID: 0}
   rotateInterval: 1
-  artYOffset: 1.7
 --- !u!114 &1448238919
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1893,8 +1889,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   currentMonster: {fileID: 1716615815}
   player: {fileID: 0}
-  monsterTelegraph: 0.55
   playerAttackState: Player_BasicAttack
+  playerHeavyAttackState: Player_HeavyAttack
 --- !u!4 &1526340401
 Transform:
   m_ObjectHideFlags: 0
@@ -2058,7 +2054,7 @@ MonoBehaviour:
   destroyDuration: 0.3
   comboCount: 0
   currentDamageMultiplier: 1
-  pivotDuration: 0.4
+  CoopLastAttackDmg: 0
 --- !u!1 &1716615814
 GameObject:
   m_ObjectHideFlags: 0
@@ -2095,6 +2091,7 @@ MonoBehaviour:
   rewardPool: []
   hpSlider: {fileID: 722817092}
   attackStateName: Basic_Attack
+  castStateName: Cast_Attack
 --- !u!4 &1716615816
 Transform:
   m_ObjectHideFlags: 0

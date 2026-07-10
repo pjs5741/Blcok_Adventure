@@ -26,15 +26,15 @@ public class CameraShake : MonoBehaviour
     {
         if (shakeDuration > 0)
         {
-            // ������ ��ġ�� ī�޶� ��ģ���� ���� ��
             transform.localPosition = originalPos + Random.insideUnitSphere * shakeMagnitude;
 
-            shakeDuration -= Time.deltaTime * dampingSpeed;
+            //--- 2026-07-10 timeScale=0(컨텍스트 튜토리얼 일시정지) 중 셰이크가 영원히 안 끝나던 문제 → unscaled 시간 사용
+            shakeDuration -= Time.unscaledDeltaTime * dampingSpeed;
         }
         else
         {
             shakeDuration = 0f;
-            transform.localPosition = originalPos; // ����ġ ����
+            transform.localPosition = originalPos; // 원위치 복원
         }
     }
 

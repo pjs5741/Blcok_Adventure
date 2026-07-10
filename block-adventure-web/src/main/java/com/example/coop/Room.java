@@ -16,7 +16,8 @@ import java.util.Random;
 public class Room {
 
     private static final long TURN_TIMEOUT_MS = 15000;
-    private static final String[] INTENTS = { "RowAttack", "RowAttack", "ConvertBlocks", "Blind" };
+    //--- 2026-07-09 얼림/시한폭탄 추가 (판 회전은 협동 미지원 — 파트너 미니뷰 그리드 크기 고정 때문)
+    private static final String[] INTENTS = { "RowAttack", "RowAttack", "ConvertBlocks", "Blind", "Freeze", "TimeBomb" };
 
     private final String id;
     private final ObjectMapper mapper;

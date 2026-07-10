@@ -307,9 +307,10 @@ public class GameManager : MonoBehaviour
             int partnerDmg = _coopResolve.partnerDamage;
 
             //--- 2026-07-06 둘 다 조작 끝난 뒤(지금) 동시에 재생: 내 공격 → 몹 피격, 이어서 상대(버디) 공격 → 몹 피격
+            //--- 2026-07-09 넉백급 데미지면 강공격 모션 (솔로와 동일 기준)
             if (atkDmg > 0 && battleManager.HasLivingMonster())
             {
-                if (player != null) player.Attack();
+                if (player != null) player.Attack(atkDmg >= m.MaxHp * Tuning.HitKnockbackRatio);
                 yield return new WaitForSeconds(Tuning.MonsterTelegraph);
                 if (battleManager.HasLivingMonster()) m.TakeDamage(atkDmg);   // 이때 HP 깎임 + 팝업 + 피격
                 yield return new WaitWhile(() => battleManager.HasLivingMonster() && m.IsHitReacting);
@@ -317,7 +318,12 @@ public class GameManager : MonoBehaviour
 
             if (partnerDmg > 0 && battleManager.HasLivingMonster())
             {
-                if (_coopBuddyAnim != null) _coopBuddyAnim.SetTrigger("basicAttack");
+                if (_coopBuddyAnim != null)
+                {
+                    bool pHeavy = partnerDmg >= m.MaxHp * Tuning.HitKnockbackRatio;
+                    if (pHeavy) AnimHelper.TriggerOrFallback(_coopBuddyAnim, "heavyAttack", "basicAttack");
+                    else _coopBuddyAnim.SetTrigger("basicAttack");
+                }
                 yield return new WaitForSeconds(Tuning.MonsterTelegraph);
                 if (battleManager.HasLivingMonster()) m.TakeDamage(partnerDmg);
                 yield return new WaitWhile(() => battleManager.HasLivingMonster() && m.IsHitReacting);
@@ -335,21 +341,22 @@ public class GameManager : MonoBehaviour
         GameEvents.RaiseTurnEnd();
     }
 
-    // 서버가 정한 몬스터 인텐트를 내 그리드에 실행(협동은 피벗/중력 제외)
-    IEnumerator ExecuteCoopIntent(string intent)
-    {
-        if (string.IsNullOrEmpty(intent) || intent == "None") yield break;   //--- 공격 없는 턴(주기 외)
-        if (blockGrid != null)
-        {
-            switch (intent)
-            {
-                case "RowAttack":     blockGrid.ShiftAndCreateRow(99, Color.gray); break;
-                case "ConvertBlocks": blockGrid.ConvertRandomBlocksToGray(3); break;
-                case "Blind":         blockGrid.ApplyBlind(3); break;
-            }
-        }
-        yield return new WaitUntil(() => blockGrid == null || !blockGrid.IsBusy);
-    }
+    //--- 2026-07-09 미사용 죽은 코드 — 협동 인텐트도 SetIntentByName → ExecuteMonsterAttack → AttackCoroutine 경유로 통합됨
+    // // 서버가 정한 몬스터 인텐트를 내 그리드에 실행(협동은 피벗/중력 제외)
+    // IEnumerator ExecuteCoopIntent(string intent)
+    // {
+    //     if (string.IsNullOrEmpty(intent) || intent == "None") yield break;   //--- 공격 없는 턴(주기 외)
+    //     if (blockGrid != null)
+    //     {
+    //         switch (intent)
+    //         {
+    //             case "RowAttack":     blockGrid.ShiftAndCreateRow(99, Color.gray); break;
+    //             case "ConvertBlocks": blockGrid.ConvertRandomBlocksToGray(3); break;
+    //             case "Blind":         blockGrid.ApplyBlind(3); break;
+    //         }
+    //     }
+    //     yield return new WaitUntil(() => blockGrid == null || !blockGrid.IsBusy);
+    // }
 
     void EndCoop(bool victory)
     {

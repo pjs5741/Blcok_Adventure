@@ -48,6 +48,9 @@ public class RelicHolder : MonoBehaviour
         tip.body = relic.Description;
     }
 
+    //--- 2026-07-09 치트키가 실배포(WebGL/itch.io) 빌드에 그대로 들어가던 문제 → 에디터/개발빌드에서만 동작 (리팩토링)
+    // 빌드에서 테스트 키가 필요하면 Build Settings의 Development Build 체크 후 빌드.
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
     // [TEST] 디버그 키. R = 랜덤 유물, P = 몬스터에 독 10스택
     void Update()
     {
@@ -83,4 +86,5 @@ public class RelicHolder : MonoBehaviour
             if (monster != null) monster.ForceNextIntent(MonsterIntent.Pivot);
         }
     }
+#endif
 }

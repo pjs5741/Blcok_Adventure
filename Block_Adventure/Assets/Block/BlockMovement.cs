@@ -36,6 +36,7 @@ public class BlockMovement : MonoBehaviour
     {
         // 초기화 안 됐거나, 굳었거나, 그리드 없으면 작동 X
         if (!isInitialized || isLocked || myGrid == null) return;
+        if (ContextTutorial.IsPaused) return;   //--- 2026-07-09 컨텍스트 튜토리얼 중 조작 차단(키 이동은 시간 무관이라 별도 차단 필요)
 
         if (Input.GetKeyDown(KeyCode.LeftArrow)) { MoveHorizontal(Vector3.left); _moveTimer = _moveInitDelay; }
         else if (Input.GetKeyDown(KeyCode.RightArrow)) { MoveHorizontal(Vector3.right); _moveTimer = _moveInitDelay; }

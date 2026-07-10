@@ -9,10 +9,14 @@ public class Player : MonoBehaviour
     public Animator animator;
 
     //--- 2026-06-26 [회피] 피벗 때 플레이어가 뒤로 포물선 점프. 앵커/정착은 PivotActor가 담당하고, 여기선 점프 변위만 extraOffset로 구동.
-    [Header("회피(점프)")]
-    public Vector2 dodgeOffset = new Vector2(-2.5f, 0f);   // 뒤로 점프 착지 변위 (Play 보며 조정)
-    public float dodgeHeight = 1.5f;                       // 포물선 정점 높이
-    public float dodgeDuration = Tuning.DodgeDuration;     // 점프 시간(피벗 회전과 맞춤)
+    //--- 2026-07-09 연출 값 FxTuning 에셋으로 이동 (씬 직렬화 덮어쓰기 방지 + 실시간 튜닝)
+    // [Header("회피(점프)")]
+    // public Vector2 dodgeOffset = new Vector2(-2.5f, 0f);   // 뒤로 점프 착지 변위 (Play 보며 조정)
+    // public float dodgeHeight = 1.5f;                       // 포물선 정점 높이
+    // public float dodgeDuration = Tuning.DodgeDuration;     // 점프 시간(피벗 회전과 맞춤)
+    Vector2 dodgeOffset => FxTuning.I.dodgeOffset;
+    float dodgeHeight => FxTuning.I.dodgeHeight;
+    float dodgeDuration => FxTuning.I.dodgeDuration;
 
     private PivotActor _pivot;
     private Vector3 _settledDisp;    // 정착 변위 (0 또는 dodgeOffset)
@@ -36,6 +40,8 @@ public class Player : MonoBehaviour
     public void Dodge()
     {
         if (_dodgeCo != null) StopCoroutine(_dodgeCo);
+        //--- 2026-07-10 점프 클립 재생(없으면 무시 — 트랜스폼 포물선은 그대로)
+        if (AnimHelper.HasTrigger(animator, "jump")) animator.SetTrigger("jump");
         _dodgeCo = StartCoroutine(HopTo((Vector3)dodgeOffset));
     }
 
@@ -43,6 +49,7 @@ public class Player : MonoBehaviour
     public void DodgeReturn()
     {
         if (_dodgeCo != null) StopCoroutine(_dodgeCo);
+        if (AnimHelper.HasTrigger(animator, "jump")) animator.SetTrigger("jump");
         _dodgeCo = StartCoroutine(HopTo(Vector3.zero));
     }
 
@@ -75,9 +82,15 @@ public class Player : MonoBehaviour
         }
     }
     
-    public virtual void Attack()
+    //--- 2026-07-09 공격 2분화: 넉백급 데미지(몬스터 넉백 조건과 동일 기준)면 강공격 모션.
+    // 강공격 클립(heavyAttack)이 아직 없으면 자동으로 기본공격 폴백. 반환 = 실제로 강공격을 재생했는지.
+    public virtual void Attack() { Attack(false); }
+
+    public bool Attack(bool heavy)
     {
+        if (heavy) return AnimHelper.TriggerOrFallback(animator, "heavyAttack", "basicAttack");
         animator.SetTrigger("basicAttack");
+        return false;
     }
 
     public void Hit(float fDamage)
