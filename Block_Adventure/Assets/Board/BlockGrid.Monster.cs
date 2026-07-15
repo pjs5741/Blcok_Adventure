@@ -149,6 +149,192 @@ public partial class BlockGrid
     }
     static readonly List<SpriteRenderer> _srBuf = new List<SpriteRenderer>();
 
+    //--- 2026-07-13 [인텐트 예고] 다음 공격에 영향받을 칸을 인텐트 선택 시점에 확정 + 마커 표시.
+    // 카운트다운 동안 보이므로 플레이어가 대비 가능. 예고 칸의 블록을 미리 지우면 그만큼 회피(카운터플레이).
+    readonly List<Vector2Int> _telegraphCells = new List<Vector2Int>();
+    readonly List<GameObject> _telegraphMarks = new List<GameObject>();
+    Vector2Int _devourCenter;
+    bool _hasDevourTelegraph;
+
+    public void ClearTelegraph()
+    {
+        _telegraphCells.Clear();
+        _hasDevourTelegraph = false;
+        foreach (var m in _telegraphMarks) if (m != null) Destroy(m);
+        _telegraphMarks.Clear();
+    }
+
+    // 삼키기 예고: 중심 확정 + 원 범위 전체(빈칸 포함 — "이 영역이 먹힌다")에 점액 마커
+    public void TelegraphDevour(float radius)
+    {
+        ClearTelegraph();
+        var filled = new List<Vector2Int>();
+        for (int x = 0; x < data.width; x++)
+            for (int y = 0; y < data.height; y++)
+                if (data.gridArray[x, y] != null) filled.Add(new Vector2Int(x, y));
+        if (filled.Count == 0) return;   // 먹을 게 없으면 예고도 없음 (실행 시 랜덤 폴백)
+
+        _devourCenter = filled[Random.Range(0, filled.Count)];
+        _hasDevourTelegraph = true;
+        float r2 = radius * radius;
+        for (int dx = -Mathf.CeilToInt(radius); dx <= Mathf.CeilToInt(radius); dx++)
+            for (int dy = -Mathf.CeilToInt(radius); dy <= Mathf.CeilToInt(radius); dy++)
+            {
+                if (dx * dx + dy * dy > r2) continue;
+                int nx = _devourCenter.x + dx, ny = _devourCenter.y + dy;
+                if (!IsValidIndex(nx, ny)) continue;
+                AddTelegraphCell(new Vector2Int(nx, ny), FxTuning.I.devourMarkColor);
+            }
+    }
+
+    //--- 2026-07-13 오염 예고: "작은 원 범위 spots군데" — 오염 가능한 블록 칸을 중심으로 각각 원 범위에 보라 마커.
+    // 실행 시 마커 칸에 남아있는 색깔 블록만 오염됨(미리 지우면 회피). 겹치는 칸은 중복 마커 방지.
+    public void TelegraphConvert(int spots, float radius)
+    {
+        ClearTelegraph();
+        var candidates = new List<Vector2Int>();
+        for (int x = 0; x < data.width; x++)
+            for (int y = 0; y < data.height; y++)
+                if (data.gridArray[x, y] != null)
+                {
+                    var bc = data.gridArray[x, y].GetComponent<BlockColor>();
+                    if (bc != null && bc.colorID != 99 && bc.colorID != GoldBlockID && bc.colorID != TimeBombID)
+                        candidates.Add(new Vector2Int(x, y));
+                }
+        if (candidates.Count == 0) return;   // 오염할 게 없으면 예고 없음 (실행 시 폴백)
+
+        // 중심 spots개 랜덤 선정 (셔플 후 앞에서부터)
+        for (int i = candidates.Count - 1; i > 0; i--)
+        {
+            int j = Random.Range(0, i + 1);
+            (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
+        }
+        int n = Mathf.Min(spots, candidates.Count);
+        var seen = new HashSet<Vector2Int>();
+        float r2 = radius * radius;
+        for (int s = 0; s < n; s++)
+        {
+            Vector2Int c = candidates[s];
+            for (int dx = -Mathf.CeilToInt(radius); dx <= Mathf.CeilToInt(radius); dx++)
+                for (int dy = -Mathf.CeilToInt(radius); dy <= Mathf.CeilToInt(radius); dy++)
+                {
+                    if (dx * dx + dy * dy > r2) continue;
+                    var cell = new Vector2Int(c.x + dx, c.y + dy);
+                    if (!IsValidIndex(cell.x, cell.y) || !seen.Add(cell)) continue;
+                    AddTelegraphCell(cell, FxTuning.I.corruptMarkColor);
+                }
+        }
+    }
+
+    void AddTelegraphCell(Vector2Int cell, Color color)
+    {
+        _telegraphCells.Add(cell);
+        _telegraphMarks.Add(TelegraphMark.Create(this.transform, cell, color));
+    }
+
+    //--- 2026-07-13 [몬스터 패턴] 삼키기(Devour): 원 범위(정수 래스터) 블록을 나선으로 빨아들여 소화(영구 제거).
+    // 점액/타이머 없음 — 스택에 구멍이 남는 것 자체가 페널티(자동 중력 없어 줄 완성이 꼬임). 회색 오염(추가형)과 결 분리.
+    private bool _devouring = false;
+    private int _suckRemaining = 0;
+
+    public void ApplyDevour(float radius) => StartCoroutine(DevourRoutine(radius));
+
+    IEnumerator DevourRoutine(float radius)
+    {
+        //--- 2026-07-13 예고된 중심이 있으면 그 자리(플레이어가 비웠으면 헛삼킴 — 회피 성공), 없으면 랜덤 폴백(협동 등)
+        Vector2Int c;
+        if (_hasDevourTelegraph)
+        {
+            c = _devourCenter;
+        }
+        else
+        {
+            var filled = new List<Vector2Int>();
+            for (int x = 0; x < data.width; x++)
+                for (int y = 0; y < data.height; y++)
+                    if (data.gridArray[x, y] != null) filled.Add(new Vector2Int(x, y));
+            if (filled.Count == 0) { Debug.Log("😋 삼키기 — 먹을 블록 없음"); yield break; }
+            c = filled[Random.Range(0, filled.Count)];
+        }
+        ClearTelegraph();
+
+        _devouring = true;
+        var fx = FxTuning.I;
+
+        // 입 위치: 현재 몬스터 기준
+        var mon = GameManager.Instance != null && GameManager.Instance.battleManager != null
+            ? GameManager.Instance.battleManager.currentMonster : null;
+        Vector3 mouth = mon != null
+            ? mon.transform.position + (Vector3)fx.devourMouthOffset
+            : new Vector3(data.width + 3f, data.height / 2f, 0f);
+
+        // 원 범위 래스터 → 그리드에서 즉시 제거(로직상 사라짐) 후 연출만 진행
+        int eaten = 0;
+        float r2 = radius * radius;
+        for (int dx = -Mathf.CeilToInt(radius); dx <= Mathf.CeilToInt(radius); dx++)
+            for (int dy = -Mathf.CeilToInt(radius); dy <= Mathf.CeilToInt(radius); dy++)
+            {
+                if (dx * dx + dy * dy > r2) continue;
+                int nx = c.x + dx, ny = c.y + dy;
+                if (!IsValidIndex(nx, ny) || data.gridArray[nx, ny] == null) continue;
+                Transform t = data.gridArray[nx, ny];
+                data.gridArray[nx, ny] = null;
+                _suckRemaining++;
+                StartCoroutine(SuckOne(t, mouth, eaten * fx.devourStagger));
+                eaten++;
+            }
+        Debug.Log($"😋 삼키기 — 블록 {eaten}개 소화 (중심 {c.x},{c.y})");
+
+        yield return new WaitUntil(() => _suckRemaining <= 0);   // 전부 입에 들어갈 때까지
+
+        // 꿀꺽 — 몸 부풀었다 복귀
+        if (mon != null)
+        {
+            Vector3 s0 = mon.transform.localScale;
+            float t2 = 0f;
+            while (t2 < 1f)
+            {
+                t2 += Time.deltaTime / Mathf.Max(fx.devourGulpDuration, 0.01f);
+                float pulse = Mathf.Sin(Mathf.Clamp01(t2) * Mathf.PI);   // 0→1→0
+                mon.transform.localScale = s0 * (1f + (fx.devourGulpScale - 1f) * pulse);
+                yield return null;
+            }
+            mon.transform.localScale = s0;
+        }
+        _devouring = false;
+    }
+
+    // 블록 하나가 나선을 그리며 입으로 빨려 들어감 (자전 + 축소)
+    IEnumerator SuckOne(Transform block, Vector3 mouth, float delay)
+    {
+        var fx = FxTuning.I;
+        if (delay > 0f) yield return new WaitForSeconds(delay);
+        if (block == null) { _suckRemaining--; yield break; }
+
+        Vector3 start = block.position;
+        Vector3 d0 = start - mouth;
+        float startAngle = Mathf.Atan2(d0.y, d0.x);
+        float startDist = d0.magnitude;
+        Vector3 baseScale = block.localScale;
+
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / Mathf.Max(fx.devourSuckDuration, 0.01f);
+            float lin = Mathf.Clamp01(t);
+            if (block == null) break;
+            float e = Mathf.SmoothStep(0f, 1f, lin);
+            float ang = startAngle + e * fx.devourSwirlTurns * Mathf.PI * 2f;   // 나선 공전
+            float dist = startDist * (1f - e);
+            block.position = mouth + new Vector3(Mathf.Cos(ang), Mathf.Sin(ang), 0f) * dist;
+            block.rotation = Quaternion.Euler(0f, 0f, lin * fx.devourSelfSpin);  // 자전
+            block.localScale = baseScale * (1f - lin);                           // 축소(소화)
+            yield return null;
+        }
+        if (block != null) Destroy(block.gameObject);
+        _suckRemaining--;
+    }
+
     //--- 2026-07-09 [몬스터 패턴] 얼림: 임의 색깔 블록 N개 빙결 — 색은 보이되 매칭 불가(줄클리어로만), turns턴 후 해동
     public void ApplyFreeze(int count, int turns)
     {
@@ -269,7 +455,8 @@ public partial class BlockGrid
     private bool _pivotAnimating = false;
     private bool _gravityShifting = false;
     public bool IsPivotAnimating => _pivotAnimating;
-    public bool IsBusy => _pivotAnimating || _gravityShifting;   // 그리드 변형 연출 중 다음 단계(스폰) 침범 금지용
+    //--- 2026-07-13 삼키기 연출도 대기 대상에 포함
+    public bool IsBusy => _pivotAnimating || _gravityShifting || _devouring;   // 그리드 변형 연출 중 다음 단계(스폰) 침범 금지용
 
     public void ApplyPivot(int turns)
     {
@@ -445,5 +632,17 @@ public partial class BlockGrid
         data.gridArray = rot;
         data.width = newW;
         data.height = newH;
+
+        //--- 2026-07-13 인텐트 예고 칸도 같은 공식으로 리매핑 + 마커 위치 갱신 (원복 중 예고가 어긋나지 않게)
+        for (int i = 0; i < _telegraphCells.Count; i++)
+        {
+            var p = _telegraphCells[i];
+            _telegraphCells[i] = ccw ? new Vector2Int(oldH - 1 - p.y, p.x) : new Vector2Int(p.y, oldW - 1 - p.x);
+            if (i < _telegraphMarks.Count && _telegraphMarks[i] != null)
+                _telegraphMarks[i].transform.position = new Vector3(_telegraphCells[i].x, _telegraphCells[i].y, -0.05f);
+        }
+        if (_hasDevourTelegraph)
+            _devourCenter = ccw ? new Vector2Int(oldH - 1 - _devourCenter.y, _devourCenter.x)
+                                : new Vector2Int(_devourCenter.y, oldW - 1 - _devourCenter.x);
     }
 }

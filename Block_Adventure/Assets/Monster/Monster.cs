@@ -4,7 +4,8 @@ using System.Collections;
 using System.Collections.Generic;
 
 //--- 2026-07-09 Freeze(얼림)/TimeBomb(시한폭탄) 추가
-public enum MonsterIntent { RowAttack, ConvertBlocks, Blind, GravityShift, GravityShiftRight, Pivot, SelfCleanse, Dispel, Freeze, TimeBomb }
+//--- 2026-07-13 Devour(삼키기 — 슬라임) 추가
+public enum MonsterIntent { RowAttack, ConvertBlocks, Blind, GravityShift, GravityShiftRight, Pivot, SelfCleanse, Dispel, Freeze, TimeBomb, Devour }
 
 public class Monster : MonoBehaviour
 {
@@ -87,7 +88,23 @@ public class Monster : MonoBehaviour
         _canEnrage = p.enrage;   //--- 2026-07-09 광폭화 가능 여부(보스)
         if (spriteRenderer != null) spriteRenderer.color = _baseColor;
         if (!string.IsNullOrEmpty(p.name)) gameObject.name = p.name;
+
+        //--- 2026-07-14 전용 아트가 있는 프로필: 컨트롤러 교체 + 틴트 해제 + 크기 보정 (중복 적용 방지 플래그)
+        if (!string.IsNullOrEmpty(p.animPath) && !_artApplied)
+        {
+            var ctrl = Resources.Load<RuntimeAnimatorController>(p.animPath);
+            var an = GetComponent<Animator>();
+            if (ctrl != null && an != null)
+            {
+                an.runtimeAnimatorController = ctrl;
+                _baseColor = Color.white;   // 픽셀아트는 원색 그대로 (틴트 구분용 색 제거)
+                if (spriteRenderer != null) spriteRenderer.color = _baseColor;
+                transform.localScale *= p.artScale;
+                _artApplied = true;
+            }
+        }
     }
+    bool _artApplied;   //--- 2026-07-14 협동(SetProfile 선호출)+Start 중복 적용 방지
 
     public virtual void Init()
     {
@@ -342,6 +359,7 @@ public class Monster : MonoBehaviour
         CurrentIntent = pick;
         if (pick != MonsterIntent.RowAttack) _intentCooldown[(int)pick] = Tuning.IntentCooldown;   // 특수 인텐트 재등장 쿨다운
         RefreshIntent();
+        RefreshTelegraph();
     }
 
     //--- 2026-06-29 [TEST] 다음 인텐트 강제 지정 — V키 등으로 정상 몬스터 턴 흐름에 태워 발동(즉시 발동 X)
@@ -349,12 +367,26 @@ public class Monster : MonoBehaviour
     {
         CurrentIntent = intent;
         RefreshIntent();
+        RefreshTelegraph();
     }
 
     //--- 2026-07-03 협동: 서버가 정한 인텐트 이름으로 아이콘 반영(로컬 랜덤 인텐트 대신)
     public void SetIntentByName(string name)
     {
-        if (System.Enum.TryParse(name, out MonsterIntent it)) { CurrentIntent = it; RefreshIntent(); }
+        if (System.Enum.TryParse(name, out MonsterIntent it)) { CurrentIntent = it; RefreshIntent(); RefreshTelegraph(); }
+    }
+
+    //--- 2026-07-13 인텐트 예고: 삼키기/오염은 대상 칸을 미리 확정해 판에 마커 표시 (그 외 인텐트는 예고 제거)
+    void RefreshTelegraph()
+    {
+        var grid = GameManager.Instance != null ? GameManager.Instance.blockGrid : null;
+        if (grid == null) return;
+        switch (CurrentIntent)
+        {
+            case MonsterIntent.Devour:        grid.TelegraphDevour(Tuning.DevourRadius); break;
+            case MonsterIntent.ConvertBlocks: grid.TelegraphConvert(Tuning.ConvertSpotCount, Tuning.ConvertSpotRadius); break;
+            default:                          grid.ClearTelegraph(); break;
+        }
     }
 
     //--- 2026-06-30 공격까지 남은 턴 수 표시 (인텐트 아래). GameManager가 매 턴 갱신.
@@ -386,13 +418,14 @@ public class Monster : MonoBehaviour
         MonsterIntent.Dispel           => "디스펠",
         MonsterIntent.Freeze           => "얼림",
         MonsterIntent.TimeBomb         => "시한폭탄",
+        MonsterIntent.Devour           => "삼키기",
         _ => "?"
     };
 
     static string IntentDesc(MonsterIntent intent) => intent switch
     {
         MonsterIntent.RowAttack        => "바닥에 회색 줄을 추가한다.",
-        MonsterIntent.ConvertBlocks    => "무작위 블록 몇 개를 회색으로 만든다.",
+        MonsterIntent.ConvertBlocks    => $"판 {Tuning.ConvertSpotCount}군데를 오염시켜 주변 블록을 회색으로 만든다.",
         MonsterIntent.Blind            => "몇 턴간 쌓인 블록이 보이지 않는다.",
         MonsterIntent.GravityShift     => "몇 턴간 중력이 왼쪽으로 작용한다.",
         MonsterIntent.GravityShiftRight => "몇 턴간 중력이 오른쪽으로 작용한다.",
@@ -401,6 +434,7 @@ public class Monster : MonoBehaviour
         MonsterIntent.Dispel           => "플레이어의 버프(방패·공격 버프)를 모두 제거한다.",
         MonsterIntent.Freeze           => $"블록 {Tuning.FreezeCount}개를 얼린다. 언 블록은 색깔 매칭이 안 되고, 줄 클리어로만 지울 수 있다. {Tuning.FreezeTurns}턴 뒤 녹는다.",
         MonsterIntent.TimeBomb         => $"판에 시한폭탄을 설치한다. {Tuning.TimeBombTurns}턴 안에 줄 클리어 등으로 없애지 못하면 터져서 주변이 회색이 된다.",
+        MonsterIntent.Devour           => "쌓인 블록을 원형으로 삼켜 소화해버린다. 삼켜진 자리는 구멍이 되어 줄 완성이 어려워진다.",
         _ => ""
     };
 
@@ -470,7 +504,21 @@ public class Monster : MonoBehaviour
 
         GameEvents.RaiseMonsterDeath();
 
-        // 기본 사망 연출: 그냥 꺼지기
+        //--- 2026-07-14 사망 연출: death 클립 있으면 재생 후 꺼짐 (없으면 기존대로 즉시 꺼짐)
+        if (AnimHelper.HasTrigger(animator, "death")) StartCoroutine(DeathRoutine());
+        else gameObject.SetActive(false);
+    }
+
+    IEnumerator DeathRoutine()
+    {
+        animator.SetTrigger("death");
+        float guard = 0f;
+        yield return new WaitUntil(() =>
+        {
+            guard += Time.deltaTime;
+            var st = animator.GetCurrentAnimatorStateInfo(0);
+            return (st.IsName("Death") && st.normalizedTime >= 1f) || guard > 3f;   // 무한대기 방지
+        });
         gameObject.SetActive(false);
     }
 
@@ -558,7 +606,7 @@ public class Monster : MonoBehaviour
                     GameManager.Instance.blockGrid.ShiftAndCreateRow(99, Color.gray);
                 break;
             case MonsterIntent.ConvertBlocks:
-                GameManager.Instance.blockGrid.ConvertRandomBlocksToGray(3);
+                GameManager.Instance.blockGrid.ApplyCorruption(Tuning.ConvertSpotCount, Tuning.ConvertSpotRadius);
                 break;
             case MonsterIntent.Blind:
                 GameManager.Instance.blockGrid.ApplyBlind(3);
@@ -587,6 +635,9 @@ public class Monster : MonoBehaviour
             case MonsterIntent.TimeBomb:
                 GameManager.Instance.blockGrid.ApplyTimeBomb(Tuning.TimeBombTurns);
                 break;
+            case MonsterIntent.Devour:
+                GameManager.Instance.blockGrid.ApplyDevour(Tuning.DevourRadius);
+                break;
         }
 
         PickIntent();
@@ -598,7 +649,7 @@ public class Monster : MonoBehaviour
         MonsterIntent.RowAttack => false,
         MonsterIntent.ConvertBlocks => false,
         MonsterIntent.Pivot => false,   // 피벗은 점프 가격(별도 연출)
-        _ => true   // Blind, GravityShift×2, SelfCleanse, Dispel, Freeze, TimeBomb
+        _ => true   // Blind, GravityShift×2, SelfCleanse, Dispel, Freeze, TimeBomb, Devour(입 벌리기 클립)
     };
 
     //--- 2026-07-09 [피벗 전용 연출] 포물선 점프로 그리드 우상단 타격 지점까지 → 공중 가격(기존 공격 모션 재생) → 착지 복귀.

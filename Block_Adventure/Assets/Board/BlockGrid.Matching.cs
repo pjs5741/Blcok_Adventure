@@ -10,31 +10,25 @@ public partial class BlockGrid
     //--- 2026-07-09 시한폭탄 블록: 줄 클리어 가능(non-gray 취급), 색매칭 X, 데미지 X. N턴 내 제거 못 하면 폭발(주변 회색화).
     public const int TimeBombID = 97;
 
-    public void ConvertRandomBlocksToGray(int count)
+    //--- 2026-07-13 오염 개편: "블록 N개" → "작은 원 범위 N군데". 예고(텔레그래프) 칸 우선 사용(미리 지우면 회피),
+    // 예고가 없으면(협동 등) 같은 로직으로 즉석 선정.
+    // (구) public void ConvertRandomBlocksToGray(int count) — 랜덤 블록 count개 개별 오염 → 범위형으로 대체됨
+    public void ApplyCorruption(int spots, float radius)
     {
-        var candidates = new List<Vector2Int>();
-        for (int x = 0; x < data.width; x++)
-            for (int y = 0; y < data.height; y++)
-                if (data.gridArray[x, y] != null)
-                {
-                    BlockColor bc = data.gridArray[x, y].GetComponent<BlockColor>();
-                    if (bc != null && bc.colorID != 99 && bc.colorID != GoldBlockID && bc.colorID != TimeBombID)   // 회색·금·시한폭탄은 변환 대상 제외
-                        candidates.Add(new Vector2Int(x, y));
-                }
+        if (!(_telegraphCells.Count > 0 && !_hasDevourTelegraph))
+            TelegraphConvert(spots, radius);   // 예고 없이 실행된 경우 즉석 선정 (같은 규칙)
 
-        for (int i = candidates.Count - 1; i > 0; i--)
+        int hit = 0;
+        foreach (var cell in _telegraphCells)
         {
-            int j = Random.Range(0, i + 1);
-            (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
+            var t = data.gridArray[cell.x, cell.y];
+            if (t == null) continue;   // 플레이어가 미리 지움 → 회피
+            var tbc = t.GetComponent<BlockColor>();
+            if (tbc != null && tbc.colorID != 99 && tbc.colorID != GoldBlockID && tbc.colorID != TimeBombID)
+            { tbc.SetColorInfo(99, Color.gray); hit++; }
         }
-
-        int converted = Mathf.Min(count, candidates.Count);
-        for (int i = 0; i < converted; i++)
-        {
-            Transform cell = data.gridArray[candidates[i].x, candidates[i].y];
-            BlockColor bc = cell.GetComponent<BlockColor>();
-            if (bc != null) bc.SetColorInfo(99, Color.gray);
-        }
+        ClearTelegraph();
+        Debug.Log($"🟪 오염 {hit}칸 (예고 회피분 제외)");
     }
 
     // 멀티줄 보너스 배율 (블록 수는 줄마다 이미 늘어나므로 배율은 과하지 않게. 1줄도 0.3→1.0로 정상 데미지)

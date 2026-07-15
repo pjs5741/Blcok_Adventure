@@ -14,6 +14,12 @@ public static class Tuning
     public const float AttackMaxWait = 2.0f;          // 공격 모션 대기 상한(무한대기 방지)
 
     //--- 2026-07-09 신규 몬스터 패턴 밸런스 (연출 값은 FxTuning으로)
+    public const float DevourRadius = 1.6f;            //--- 2026-07-13 삼키기: 원 범위 반지름(1.6=대략 3x3, 정수 격자로 래스터)
+    //--- 2026-07-13 오염: 개수형(블록 3개) → "작은 원 범위 3군데"로 변경. 합산 범위가 슬라임 삼키기(1.6 한 곳)보다 넓게.
+    // public const int ConvertBlockCount = 3;
+    // public const float ConvertRadius = 2.0f;         // (1차안) 큰 원 1개 — 3군데 산개로 대체
+    public const int ConvertSpotCount = 3;              // 오염 구역 수
+    public const float ConvertSpotRadius = 1.2f;        // 구역당 반지름(1.2=대략 5칸 십자)
     public const int FreezeCount = 4;                  // 얼림: 한 번에 어는 블록 수
     public const int FreezeTurns = 2;                  // 얼림: 해동까지 턴 수
     public const int TimeBombTurns = 3;                // 시한폭탄: 폭발까지 턴 수

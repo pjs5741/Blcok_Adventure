@@ -22,15 +22,20 @@ public static class MonsterRegistry
     {
         new MonsterProfile {
             name = "슬라임", maxHp = 300, goldReward = 20, tint = new Color(0.5f, 0.85f, 0.5f),
-            intentPool = new[] { MonsterIntent.RowAttack },   // 입문용: 줄추가만
-            rewardShapes = NormalShapes
+            //--- 2026-07-13 시그니처 패턴 '삼키기' 추가 (입문몹이라 줄추가 가중치 높게 유지)
+            intentPool = new[] { MonsterIntent.RowAttack, MonsterIntent.RowAttack, MonsterIntent.Devour },
+            rewardShapes = NormalShapes,
+            //--- 2026-07-14 전용 픽셀아트 (크기는 눈보고 artScale 조정)
+            animPath = "MonsterAnim/Slime/SlimeController", artScale = 0.65f
         },
         new MonsterProfile {
             name = "좀비", maxHp = 500, goldReward = 25, tint = new Color(0.6f, 0.4f, 0.7f),
             intentPool = new[] { MonsterIntent.RowAttack, MonsterIntent.RowAttack,
                                  MonsterIntent.ConvertBlocks, MonsterIntent.Blind,
                                  MonsterIntent.SelfCleanse },   // 독/화상 빌드 견제
-            rewardShapes = NormalShapes
+            rewardShapes = NormalShapes,
+            //--- 2026-07-14 전용 픽셀아트
+            animPath = "MonsterAnim/Zombie/ZombieController", artScale = 0.65f
         },
     };
 
@@ -43,7 +48,9 @@ public static class MonsterRegistry
                                  MonsterIntent.Dispel, MonsterIntent.SelfCleanse,
                                  MonsterIntent.Freeze },   //--- 2026-07-09 얼림(매칭 방해) 추가
             rewardShapes = EliteShapes,
-            attackInterval = 2   // 엘리트: 2턴마다 공격
+            attackInterval = 2,  // 엘리트: 2턴마다 공격
+            //--- 2026-07-15 전용 픽셀아트
+            animPath = "MonsterAnim/Golem/GolemController", artScale = 0.65f
         },
     };
 

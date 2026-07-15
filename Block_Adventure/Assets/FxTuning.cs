@@ -56,6 +56,20 @@ public class FxTuning : ScriptableObject
     public Color freezeTint = new Color(0.55f, 0.8f, 1f);   // 얼음 색 (원래 색과 혼합)
     [Range(0f, 1f)] public float freezeTintStrength = 0.65f; // 얼음 색 혼합 비율
 
+    [Header("인텐트 예고 마커 (텔레그래프)")]
+    public Color devourMarkColor = new Color(0.45f, 0.75f, 0.3f, 0.4f);    // 먹힐 칸 — 점액 연두
+    public Color corruptMarkColor = new Color(0.55f, 0.35f, 0.65f, 0.4f);  // 오염될 칸 — 칙칙한 보라
+    public float telegraphPulseRate = 4f;                                   // 마커 알파 펄스 속도
+
+    [Header("삼키기 (슬라임 Devour)")]
+    public float devourSuckDuration = 0.65f;                 // 블록이 입까지 빨려가는 시간
+    public float devourSwirlTurns = 1.2f;                    // 나선 회전 바퀴 수
+    public float devourSelfSpin = 720f;                      // 블록 자체 회전(도)
+    public float devourStagger = 0.05f;                      // 블록별 시작 지연(차례로 빨려듦)
+    public Vector2 devourMouthOffset = new Vector2(0f, 3f);  // 몬스터 기준 입 위치 오프셋
+    public float devourGulpScale = 1.15f;                    // 꿀꺽 순간 몸 부풀기 배율
+    public float devourGulpDuration = 0.35f;                 // 꿀꺽 연출 시간
+
     [Header("시한폭탄")]
     public Color bombColor = new Color(0.55f, 0.1f, 0.12f);    // 폭탄 블록 색
     public Color bombWarnColor = new Color(0.95f, 0.2f, 0.15f); // 1턴 남았을 때 색
