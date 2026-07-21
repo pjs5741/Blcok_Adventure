@@ -76,8 +76,8 @@ MonoBehaviour:
   dodgeDuration: 0.6
   blindFadeDuration: 0.45
   freezeFadeDuration: 0.45
-  freezeTint: {r: 0.55, g: 0.8, b: 1, a: 1}
-  freezeTintStrength: 0.65
+  freezeTint: {r: 0.3, g: 0.75, b: 1, a: 1}
+  freezeTintStrength: 0.88
   bombColor: {r: 0.55, g: 0.1, b: 0.12, a: 1}
   bombWarnColor: {r: 0.95, g: 0.2, b: 0.15, a: 1}
   bombExplodeShakeDuration: 0.3

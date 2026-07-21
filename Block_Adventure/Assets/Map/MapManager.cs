@@ -359,13 +359,22 @@ public class MapManager : MonoBehaviour
                              || node.type == NodeType.Elite || node.type == NodeType.Boss;
                 int seed = UnityEngine.Random.Range(1, int.MaxValue);
                 int hp = 0, interval = 3;
+                string[] intents = null;   //--- 2026-07-20 협동도 솔로처럼 몹별 인텐트 풀 사용 → 방장이 뽑아 서버로 전송
                 if (isBattle)
                 {
                     var prof = MonsterRegistry.GetForNode(node.type, seed);
                     hp = Mathf.RoundToInt((prof != null ? prof.maxHp : 300f) * 2f);
                     interval = prof != null ? prof.attackInterval : 3;
+                    //--- 판 회전(Pivot)은 협동 미지원(그리드 크기 변경 → 파트너 미니뷰 불가)이라 풀에서 제외
+                    if (prof != null && prof.intentPool != null)
+                    {
+                        var list = new System.Collections.Generic.List<string>();
+                        foreach (var it in prof.intentPool)
+                            if (it != MonsterIntent.Pivot) list.Add(it.ToString());
+                        intents = list.ToArray();
+                    }
                 }
-                c.MapSelect(node.id, isBattle, hp, seed, interval);
+                c.MapSelect(node.id, isBattle, hp, seed, interval, intents);
             }
             else c.MapEmote(node.id);
             return;

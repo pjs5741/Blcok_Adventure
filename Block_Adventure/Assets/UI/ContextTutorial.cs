@@ -49,6 +49,8 @@ public class ContextTutorial : MonoBehaviour
     {
         foreach (var k in new[] { "match", "lineclear", "gray", "freeze", "timebomb", "pivot" })
             PlayerPrefs.DeleteKey(KeyPrefix + k);
+        //--- 2026-07-15 인트로 튜토리얼(TutorialOverlay, "tutorialSeen")도 함께 초기화 — 리셋 한 번으로 전부 다시 뜨게
+        PlayerPrefs.DeleteKey("tutorialSeen");
         PlayerPrefs.Save();
     }
 

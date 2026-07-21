@@ -64,7 +64,9 @@ public static class MonsterRegistry
                                  MonsterIntent.TimeBomb },   //--- 2026-07-09 시한폭탄 추가
             rewardShapes = BossShapes,
             attackInterval = 1,  // 보스: 매 턴 공격
-            enrage = true        //--- 2026-07-09 체력 50% 이하 광폭화(줄추가 2개)
+            enrage = true,       //--- 2026-07-09 체력 50% 이하 광폭화(줄추가 2개)
+            //--- 2026-07-16 전용 픽셀아트 (일반 몹 0.65보다 크게 — 보스감. 눈보고 조정)
+            animPath = "MonsterAnim/Boss/BossController", artScale = 0.9f
         },
     };
 

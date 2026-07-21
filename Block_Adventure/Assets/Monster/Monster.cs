@@ -21,6 +21,10 @@ public class Monster : MonoBehaviour
     public bool IsHitReacting => _hitting;        //--- 2026-06-30 피격 모션 진행 중 여부 (공격 후 중력 대기용)
     static readonly Color PoisonColor = new Color(0.6f, 0.2f, 0.85f);   // 독 상태 보라색
     protected bool isDead = false;
+    //--- 2026-07-15 데드 페이즈용 상태 노출: 사망 즉시(데스모션 재생 중 포함) 판정 + 데스모션 재생 여부
+    public bool IsDead => isDead;              // 데스모션이 다 끝나기 전에도 true (죽어가는 몹이 공격/피격되는 것 방지)
+    public bool IsDeathPlaying => _deathPlaying;   // GameManager 데드 페이즈가 이게 false 될 때까지 대기
+    protected bool _deathPlaying = false;
     protected int _poisonStacks = 0;
     protected int _burnStacks = 0;
     //--- 2026-07-01 디버프 걸린 순서(작을수록 먼저=왼쪽). 소진되면 -1.
@@ -33,6 +37,10 @@ public class Monster : MonoBehaviour
     protected bool _canEnrage;          // 프로필에서 주입 (보스만)
     protected bool _enraged;
     public bool IsEnraged => _enraged;
+    //--- 2026-07-15 삼키기(Devour) 성장: 실제로 삼킨 횟수만큼 몸이 커지고(영구), 다음 삼키기 반경도 커짐
+    protected int _devourTimes = 0;
+    // 현재 삼키기 반경(삼킬수록 +0.15씩, 상한 +1.2). 예고(텔레그래프)와 실행이 같은 값을 쓰도록 단일 소스.
+    public float CurrentDevourRadius => Tuning.DevourRadius + Mathf.Min(_devourTimes * 0.15f, 1.2f);
 
     [Header("보상 블록")]
     [SerializeField] protected List<GameObject> rewardPool = new List<GameObject>();
@@ -113,6 +121,7 @@ public class Monster : MonoBehaviour
         _poisonStacks = 0;
         _burnStacks = 0;
         _poisonOrder = -1; _burnOrder = -1; _debuffSeq = 0;
+        _devourTimes = 0;   //--- 2026-07-15 전투 단위 삼키기 성장 초기화(재사용 대비)
         _attackCountdown = Mathf.Max(1, attackInterval);
         if (_intentCooldown == null) _intentCooldown = new int[System.Enum.GetValues(typeof(MonsterIntent)).Length];
         else System.Array.Clear(_intentCooldown, 0, _intentCooldown.Length);
@@ -383,7 +392,7 @@ public class Monster : MonoBehaviour
         if (grid == null) return;
         switch (CurrentIntent)
         {
-            case MonsterIntent.Devour:        grid.TelegraphDevour(Tuning.DevourRadius); break;
+            case MonsterIntent.Devour:        grid.TelegraphDevour(CurrentDevourRadius); break;
             case MonsterIntent.ConvertBlocks: grid.TelegraphConvert(Tuning.ConvertSpotCount, Tuning.ConvertSpotRadius); break;
             default:                          grid.ClearTelegraph(); break;
         }
@@ -495,6 +504,41 @@ public class Monster : MonoBehaviour
         RefreshIntent();
     }
 
+    //--- 2026-07-15 삼키기 성공(블록을 실제로 삼킴) 시 호출: 몸집 커짐(영구) + 다음 삼키기 반경 강화.
+    // BlockGrid.DevourRoutine이 "꿀꺽" 연출 뒤 삼킨 개수와 함께 호출. 헛삼킴(0개, 플레이어 회피)이면 성장 없음.
+    public void OnDevoured(int blocksEaten)
+    {
+        if (blocksEaten <= 0) return;
+        _devourTimes++;
+        StartCoroutine(DevourGrowRoutine(blocksEaten));
+        Debug.Log($"🐛 슬라임 성장! (삼킨 횟수 {_devourTimes}, 이번 {blocksEaten}개, 다음 반경 {CurrentDevourRadius:F2})");
+    }
+
+    IEnumerator DevourGrowRoutine(int blocksEaten)
+    {
+        Vector3 from = transform.localScale;
+        float grow = 1f + Mathf.Min(blocksEaten * 0.02f, 0.1f);   // 이번에 삼킨 만큼 커짐(한 번에 최대 +10%)
+        Vector3 to = from * grow;
+        if (CameraShake.Instance != null) CameraShake.Instance.TriggerShake(0.2f, 0.15f);
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / 0.35f;
+            transform.localScale = Vector3.Lerp(from, to, Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(t)));
+            yield return null;
+        }
+        transform.localScale = to;
+    }
+
+    //--- 2026-07-20 협동: 서버가 사망 확정(_coopResolve.monsterDead)했는데 로컬 데미지 반올림으로 아직 안 죽었으면
+    // 강제로 사망 처리 → 솔로와 동일하게 데스모션이 반드시 재생되도록 보장.
+    public void EnsureDead()
+    {
+        if (isDead) return;
+        currentHp = 0f;
+        Die();
+    }
+
     // 사망 처리 (virtual)
     protected virtual void Die()
     {
@@ -511,6 +555,7 @@ public class Monster : MonoBehaviour
 
     IEnumerator DeathRoutine()
     {
+        _deathPlaying = true;   //--- 2026-07-15 데스모션 시작 → GameManager 데드 페이즈가 완료까지 대기
         animator.SetTrigger("death");
         float guard = 0f;
         yield return new WaitUntil(() =>
@@ -519,6 +564,8 @@ public class Monster : MonoBehaviour
             var st = animator.GetCurrentAnimatorStateInfo(0);
             return (st.IsName("Death") && st.normalizedTime >= 1f) || guard > 3f;   // 무한대기 방지
         });
+        //--- 2026-07-15 SetActive(false) 전에 내려야 함 (비활성 순간 이 코루틴이 중단되어 이후 줄이 실행되지 않음)
+        _deathPlaying = false;
         gameObject.SetActive(false);
     }
 
@@ -579,7 +626,7 @@ public class Monster : MonoBehaviour
         {
             yield return JumpStrikeRoutine();
             GameManager.Instance.blockGrid.ApplyPivot(3);
-            PickIntent();
+            if (!CoopSession.Active) PickIntent();   //--- 2026-07-20 협동은 서버가 인텐트 소유(피벗은 협동 미사용이지만 일관성)
             yield break;
         }
 
@@ -636,11 +683,12 @@ public class Monster : MonoBehaviour
                 GameManager.Instance.blockGrid.ApplyTimeBomb(Tuning.TimeBombTurns);
                 break;
             case MonsterIntent.Devour:
-                GameManager.Instance.blockGrid.ApplyDevour(Tuning.DevourRadius);
+                GameManager.Instance.blockGrid.ApplyDevour(CurrentDevourRadius);   //--- 2026-07-15 삼킬수록 반경↑
                 break;
         }
 
-        PickIntent();
+        //--- 2026-07-20 협동은 인텐트/예고를 서버가 소유(CoopSyncPhase가 nextIntent로 세팅) → 로컬 재추첨 금지. 솔로만 다음 인텐트 추첨.
+        if (!CoopSession.Active) PickIntent();
     }
 
     //--- 2026-07-09 모션 분류: 몸으로 때리는 패턴=기본공격, 판을 조작하는 패턴=시전(Cast)

@@ -46,7 +46,7 @@ public class CoopClient : MonoBehaviour
     [Serializable] public class RoomInfo { public string id; public string host; public int count; public bool started; }
     public class RoomState { public string host, guest; public bool hostReady, guestReady; }
     public class GameStartData { public int seed, playerIndex, monsterHp, monsterMaxHp; }
-    public class ResolveData { public int monsterHp, monsterMaxHp, partnerDamage, attackCountdown; public bool monsterDead; public string intent; public int[] partnerGrid; }
+    public class ResolveData { public int monsterHp, monsterMaxHp, partnerDamage, attackCountdown; public bool monsterDead; public string intent; public string nextIntent; public int[] partnerGrid; }
 
     [Serializable]
     class CoopMsg
@@ -58,7 +58,7 @@ public class CoopClient : MonoBehaviour
         public string host, guest; public bool hostReady, guestReady;
         public string from, text;
         public int seed, monsterHp, monsterMaxHp, nodeId, partnerDamage, monsterSeed, attackCountdown; public bool monsterDead;
-        public string intent; public int[] partnerGrid;
+        public string intent; public string nextIntent; public int[] partnerGrid;
     }
 
     readonly ConcurrentQueue<string> _inbox = new ConcurrentQueue<string>();
@@ -93,8 +93,13 @@ public class CoopClient : MonoBehaviour
     public void LeaveRoom()           => Send("{\"type\":\"leaveRoom\"}");
     public void SetReady(bool ready)  => Send($"{{\"type\":\"ready\",\"ready\":{(ready ? "true" : "false")}}}");
     public void StartGame()           => Send("{\"type\":\"startGame\"}");
-    public void MapSelect(int nodeId, bool isBattle, int monsterHp, int monsterSeed, int attackInterval)
-        => Send($"{{\"type\":\"mapSelect\",\"nodeId\":{nodeId},\"isBattle\":{(isBattle ? "true" : "false")},\"monsterHp\":{monsterHp},\"monsterSeed\":{monsterSeed},\"attackInterval\":{attackInterval}}}");
+    //--- 2026-07-20 intents: 이 몹의 인텐트 풀(이름 배열). 방장이 MonsterRegistry에서 뽑아 전달 → 서버가 이 풀로 인텐트 선택(솔로와 동일).
+    public void MapSelect(int nodeId, bool isBattle, int monsterHp, int monsterSeed, int attackInterval, string[] intents = null)
+    {
+        string intentsJson = (intents != null && intents.Length > 0)
+            ? "[\"" + string.Join("\",\"", intents) + "\"]" : "[]";
+        Send($"{{\"type\":\"mapSelect\",\"nodeId\":{nodeId},\"isBattle\":{(isBattle ? "true" : "false")},\"monsterHp\":{monsterHp},\"monsterSeed\":{monsterSeed},\"attackInterval\":{attackInterval},\"intentPool\":{intentsJson}}}");
+    }
     public void MapEmote(int nodeId)  => Send($"{{\"type\":\"mapEmote\",\"nodeId\":{nodeId}}}");
     public void SendNodeDone()        => Send("{\"type\":\"nodeDone\"}");
     public void LobbyChat(string t)   => Send($"{{\"type\":\"lobbyChat\",\"text\":\"{Esc(t)}\"}}");
@@ -176,7 +181,7 @@ public class CoopClient : MonoBehaviour
             case "advanceReady":   OnAdvanceReady?.Invoke(); break;
             case "waitPartnerNode": OnWaitPartnerNode?.Invoke(); break;
             case "waitPartner": OnWaitPartner?.Invoke(); break;
-            case "resolve":     OnResolve?.Invoke(new ResolveData { monsterHp = m.monsterHp, monsterMaxHp = m.monsterMaxHp, monsterDead = m.monsterDead, intent = m.intent, partnerGrid = m.partnerGrid, partnerDamage = m.partnerDamage, attackCountdown = m.attackCountdown }); break;
+            case "resolve":     OnResolve?.Invoke(new ResolveData { monsterHp = m.monsterHp, monsterMaxHp = m.monsterMaxHp, monsterDead = m.monsterDead, intent = m.intent, nextIntent = m.nextIntent, partnerGrid = m.partnerGrid, partnerDamage = m.partnerDamage, attackCountdown = m.attackCountdown }); break;
             case "grid":        OnPartnerGrid?.Invoke(m.partnerGrid); break;
             case "partnerLeft": OnPartnerLeft?.Invoke(); break;
             case "__closed":    Connected = false; OnClosed?.Invoke(); break;

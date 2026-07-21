@@ -7,11 +7,12 @@ public static class FxTuningCreator
     const string Path = "Assets/Resources/FxTuning.asset";
 
     //--- 2026-07-10 컨텍스트 튜토리얼(행동별 1회) 다시 보기 — 본 기록 초기화
-    [MenuItem("Build/Reset Context Tutorials")]
+    //--- 2026-07-15 인트로 튜토리얼(tutorialSeen)도 함께 초기화됨(ResetAll 확장)
+    [MenuItem("Build/Reset Tutorials (Intro + Context)")]
     public static void ResetTutorials()
     {
         ContextTutorial.ResetAll();
-        Debug.Log("✅ 컨텍스트 튜토리얼 기록 초기화 — 다음 플레이에서 다시 뜸");
+        Debug.Log("✅ 튜토리얼 기록 초기화(인트로+컨텍스트) — 다음 플레이에서 다시 뜸");
     }
 
     [MenuItem("Build/Create FxTuning Asset")]

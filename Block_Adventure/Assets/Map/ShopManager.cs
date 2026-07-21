@@ -133,13 +133,17 @@ public class ShopManager : MonoBehaviour
         Image img = slot.GetComponent<Image>();
         img.color = available ? bgColor : new Color(0.2f, 0.2f, 0.2f);
 
+        bool isCard = false;   //--- 2026-07-15 카드 여부(가격 텍스트 위치 분기용)
+
         //--- 2026-07-06 카드면 블록 모양(색 셀) + 효과 이름, 아니면(유물/판매됨) 이름 텍스트
         if (shapeName != null && colorID > 0)
         {
             var shapeHost = UIBuilder.NewUI("Shape", slot.transform, typeof(RectTransform));
-            UIBuilder.SetAnchors((RectTransform)shapeHost.transform, new Vector2(0.15f, 0.5f), new Vector2(0.85f, 0.9f));
+            UIBuilder.SetAnchors((RectTransform)shapeHost.transform, new Vector2(0.15f, 0.55f), new Vector2(0.85f, 0.9f));
             ShapeMiniView.Build((RectTransform)shapeHost.transform, shapeName, colorID, 30f);
-            CreateChildText(slot.transform, "Name", new Vector2(0, 0.4f), new Vector2(1, 0.5f), itemName, 30, Color.white);
+            //--- 2026-07-15 이름/가격 세로 범위가 겹쳐 글씨가 포개지던 문제 → 이름(0.42~0.52)·가격(0.29~0.4)으로 분리
+            CreateChildText(slot.transform, "Name", new Vector2(0, 0.42f), new Vector2(1, 0.52f), itemName, 30, Color.white);
+            isCard = true;
         }
         else
         {
@@ -148,7 +152,10 @@ public class ShopManager : MonoBehaviour
 
         if (price > 0)
         {
-            Text priceText = CreateChildText(slot.transform, "Price", new Vector2(0, 0.3f), new Vector2(1, 0.55f), $"{price} 골드", 32, new Color(1f, 0.85f, 0.3f));
+            //--- 2026-07-15 카드면 이름 바로 아래 좁은 띠(겹침 방지), 유물/기타면 기존 위치
+            Vector2 pMin = isCard ? new Vector2(0, 0.29f) : new Vector2(0, 0.3f);
+            Vector2 pMax = isCard ? new Vector2(1, 0.4f)  : new Vector2(1, 0.55f);
+            Text priceText = CreateChildText(slot.transform, "Price", pMin, pMax, $"{price} 골드", 32, new Color(1f, 0.85f, 0.3f));
         }
 
         if (available && Run.stats.gold >= price)

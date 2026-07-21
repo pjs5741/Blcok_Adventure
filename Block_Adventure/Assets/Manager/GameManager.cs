@@ -9,6 +9,7 @@ public enum GameState
     Calculate,
     MonsterTurn,
     GameOverCheck,
+    Dead,        //--- 2026-07-15 데드 페이즈: 몬스터 사망 → 데스모션 완료 대기 → 보상
     Reward,
     GameOver,
     GameClear
@@ -35,6 +36,8 @@ public class GameManager : MonoBehaviour
     //--- 2026-07-01 협동(멀티) 상태
     private bool _coopResolved, _coopPartnerLeft;
     private CoopClient.ResolveData _coopResolve;
+    //--- 2026-07-20 협동 예고(텔레그래프): 마지막으로 예고한 인텐트. nextIntent가 바뀔 때만 다시 그림(매 턴 재계산하면 예고 칸이 움직여 회피 불가).
+    private string _coopTelegraphedIntent;
 
     void Awake()
     {
@@ -131,6 +134,11 @@ public class GameManager : MonoBehaviour
     {
         var node = Run.mapState != null ? Run.mapState.GetNode(nodeId) : null;
 
+        //--- 2026-07-15 데드 페이즈(협동): 몬스터가 죽었으면 데스모션을 끝까지 재생한 뒤 보상 표시
+        var deadMon = battleManager != null ? battleManager.currentMonster : null;
+        if (deadMon != null && deadMon.IsDead)
+            yield return new WaitWhile(() => deadMon.IsDeathPlaying);
+
         // 보상: 각자 자기 덱에 카드 획득(개인별)
         if (rewardManager != null && battleManager != null)
             yield return StartCoroutine(rewardManager.ShowReward(battleManager.currentMonster));
@@ -221,12 +229,32 @@ public class GameManager : MonoBehaviour
             yield return StartCoroutine(DotPhase());   //--- 2026-06-30 도트(독/화상) 전용 페이즈 (보이게)
             if (IsTerminated()) break;
 
+            //--- 2026-07-15 데드 페이즈: 데미지(계산/도트) 뒤 몬스터가 죽었으면 데스모션을 끝까지 재생하고 보상 → 씬 전환.
+            //    죽어가는 몬스터가 다시 공격하거나 다음 플레이어 턴 블록이 스폰되는 것을 방지.
+            //    (협동은 승리/보상을 서버 battleEnd(OnCoopBattleEnd)가 처리하므로 여기선 스킵)
+            if (!CoopSession.Active && MonsterIsDead())
+            {
+                yield return StartCoroutine(DeadPhase());
+                break;
+            }
+
             //--- 2026-07-01 협동이면 서버 턴 동기화, 아니면 기존 로컬 몬스터 턴
             if (CoopSession.Active)
                 yield return StartCoroutine(CoopSyncPhase(coopHpBefore));
             else
                 yield return StartCoroutine(MonsterTurnPhase());
             if (IsTerminated()) break;
+
+            //--- 2026-07-20 협동 데드 페이즈: 로컬에서 몬스터가 죽었으면 더 이상 진행(다음 블록 스폰) 말고
+            // 서버 battleEnd(OnCoopBattleEnd→CoopBattleEndRoutine)가 데스모션 완료까지 기다린 뒤 보상/전환하도록 대기.
+            // (솔로의 DeadPhase와 동일 취지 — 죽어가는 중 블록이 또 스폰되던 문제 방지)
+            if (CoopSession.Active && MonsterIsDead())
+            {
+                float deadGuard = 0f;
+                yield return new WaitUntil(() => _coopEnded || _coopPartnerLeft || (deadGuard += Time.deltaTime) > 15f);
+                if (_coopPartnerLeft) { EndCoop(false); yield break; }
+                break;   // battleEnd가 왔으면 CoopBattleEndRoutine이 보상/전환 처리
+            }
 
             yield return StartCoroutine(GameOverCheckPhase());
         }
@@ -330,13 +358,29 @@ public class GameManager : MonoBehaviour
             }
 
             m.SetHp(_coopResolve.monsterHp);   // 서버 권위값으로 정합
+            //--- 2026-07-20 서버가 사망 확정이면 로컬도 확실히 사망 처리(데스모션 재생 보장) — 솔로와 동일
+            if (_coopResolve.monsterDead) m.EnsureDead();
             m.SetAttackCountdown(_coopResolve.attackCountdown);   //--- 서버 동기 카운트다운
-            if (!string.IsNullOrEmpty(_coopResolve.intent) && _coopResolve.intent != "None")
-                m.SetIntentByName(_coopResolve.intent);   //--- 실제 인텐트 아이콘 반영(None이면 유지)
             CoopPartnerView.Instance?.Render(_coopResolve.partnerGrid);
-            //--- 2026-07-03 이번 턴 공격이면 몬스터 공격 모션 + 인텐트 발동(위에서 SetIntentByName로 CurrentIntent 세팅됨)
-            if (!_coopResolve.monsterDead && !string.IsNullOrEmpty(_coopResolve.intent) && _coopResolve.intent != "None")
+
+            //--- 2026-07-20 이번 턴 발동 인텐트. 지난 사이클에 nextIntent로 이미 예고돼 CurrentIntent+예고칸이 세팅된 상태 →
+            // 셀 재계산 없이 그대로 발동(재계산하면 예고 칸이 바뀌어 회피가 무의미해짐). 만약 어긋나 있으면 서버값으로 보정.
+            bool fire = !_coopResolve.monsterDead && !string.IsNullOrEmpty(_coopResolve.intent) && _coopResolve.intent != "None";
+            if (fire)
+            {
+                if (m.CurrentIntent.ToString() != _coopResolve.intent) m.SetIntentByName(_coopResolve.intent);
+                _coopTelegraphedIntent = null;   // 발동으로 예고 소진 → 다음 nextIntent를 새로 예고
                 yield return StartCoroutine(battleManager.ExecuteMonsterAttack());
+            }
+
+            //--- 2026-07-20 다음 공격 인텐트를 미리 예고(텔레그래프+아이콘) — 솔로처럼 카운트다운 동안 대비 가능.
+            // nextIntent가 바뀔 때만 1회 세팅(매 턴 SetIntentByName하면 예고 칸이 매턴 재추첨되어 회피 불가).
+            string next = _coopResolve.nextIntent;
+            if (!_coopResolve.monsterDead && !string.IsNullOrEmpty(next) && next != "None" && next != _coopTelegraphedIntent)
+            {
+                m.SetIntentByName(next);
+                _coopTelegraphedIntent = next;
+            }
         }
         GameEvents.RaiseTurnEnd();
     }
@@ -398,22 +442,40 @@ public class GameManager : MonoBehaviour
         //--- 2026-07-03 협동: 승리(몹 처치)는 서버 battleEnd(OnCoopBattleEnd)가 맵복귀/클리어 처리. 여기선 진행만.
         if (CoopSession.Active) yield break;
 
-        if (battleManager != null && !battleManager.HasLivingMonster())
+        //--- 2026-07-15 몬스터 처치 보상은 데드 페이즈(DeadPhase)로 이관 → 여기서는 플레이어 패배(천장 도달)만 판정.
+    }
+
+    //--- 2026-07-15 단일플레이 몬스터 사망 판정 (데스모션 재생 시작 즉시 true)
+    bool MonsterIsDead()
+    {
+        var m = battleManager != null ? battleManager.currentMonster : null;
+        return m != null && m.IsDead;
+    }
+
+    //--- 2026-07-15 데드 페이즈: 몬스터 데스모션을 끝까지 재생한 뒤 보상 → (보스면 클리어 / 아니면 맵 복귀).
+    //    기존 GameOverCheckPhase의 몬스터 처치 보상 로직을 이관.
+    IEnumerator DeadPhase()
+    {
+        CurrentState = GameState.Dead;
+
+        // 데스모션(사망 애니메이션)이 다 끝날 때까지 대기. death 클립 없는 몹은 즉시 통과.
+        var m = battleManager != null ? battleManager.currentMonster : null;
+        if (m != null)
+            yield return new WaitWhile(() => m.IsDeathPlaying);
+
+        yield return StartCoroutine(RewardPhase());
+
+        // 보스 처치면 라운드 클리어
+        var currentNode = Run.mapState?.GetNode(Run.mapState.currentNodeId);
+        if (currentNode != null && currentNode.type == NodeType.Boss)
         {
-            yield return StartCoroutine(RewardPhase());
-
-            // 보스 처치면 라운드 클리어
-            var currentNode = Run.mapState?.GetNode(Run.mapState.currentNodeId);
-            if (currentNode != null && currentNode.type == NodeType.Boss)
-            {
-                Run.lastResult = RunResult.Victory;
-                SceneManager.LoadScene("EndScene");
-                yield break;
-            }
-
-            blockGrid.SaveSnapshot();
-            SceneManager.LoadScene("MapScene");
+            Run.lastResult = RunResult.Victory;
+            SceneManager.LoadScene("EndScene");
+            yield break;
         }
+
+        blockGrid.SaveSnapshot();
+        SceneManager.LoadScene("MapScene");
     }
 
     IEnumerator RewardPhase()

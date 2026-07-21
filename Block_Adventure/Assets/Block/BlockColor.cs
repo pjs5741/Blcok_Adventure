@@ -10,6 +10,9 @@ public class BlockColor : MonoBehaviour
     public bool IsFrozen => frozenTurns > 0;
     Color _unfrozenColor;    // 해동 시 복귀할 원래 배경색
     Coroutine _tintCo;
+    //--- 2026-07-15 얼림이 색 틴트만으론 티가 안 나서(#6) 얼음 테두리 오버레이 추가 — 블록/아이콘은 비치되 얼었음이 명확
+    Transform _frost;
+    static Sprite _frostSprite;
 
     public void Freeze(int turns)
     {
@@ -19,6 +22,7 @@ public class BlockColor : MonoBehaviour
         frozenTurns = turns;
         var fx = FxTuning.I;
         StartTint(Color.Lerp(_unfrozenColor, fx.freezeTint, fx.freezeTintStrength), fx.freezeFadeDuration);
+        AddFrost();
     }
 
     // 매 턴 감소. 해동되는 턴이면 true (호출부 로그용)
@@ -28,7 +32,56 @@ public class BlockColor : MonoBehaviour
         frozenTurns--;
         if (frozenTurns > 0) return false;
         StartTint(_unfrozenColor, FxTuning.I.freezeFadeDuration);   // 원래 색으로 해동 페이드
+        RemoveFrost();
         return true;
+    }
+
+    //--- 2026-07-15 얼음 테두리 오버레이 (둥근 사각 링). 블록/아이콘 위에 얹되 가운데는 비어 색·아이콘이 보임.
+    void AddFrost()
+    {
+        if (_frost != null) return;
+        var go = new GameObject("FrostOverlay", typeof(SpriteRenderer));
+        go.transform.SetParent(transform, false);
+        go.transform.localPosition = new Vector3(0f, 0f, -0.02f);   // 아이콘(-0.01)보다 살짝 앞
+        go.transform.localScale = Vector3.one;
+        var fsr = go.GetComponent<SpriteRenderer>();
+        fsr.sprite = FrostSprite();
+        fsr.color = new Color(0.75f, 0.95f, 1f, 0.95f);   // 밝은 얼음빛
+        var mainSr = GetComponent<SpriteRenderer>();
+        fsr.sortingOrder = (mainSr != null ? mainSr.sortingOrder : 0) + 2;   // 아이콘(+1) 위
+        _frost = go.transform;
+    }
+
+    void RemoveFrost()
+    {
+        if (_frost != null) { Destroy(_frost.gameObject); _frost = null; }
+    }
+
+    // 둥근 사각형 "링"(테두리)만 불투명, 안쪽은 투명 — 얼음 프레임. 1회 절차 생성.
+    static Sprite FrostSprite()
+    {
+        if (_frostSprite != null) return _frostSprite;
+        const int S = 64;
+        const float corner = 12f, edge = 6f;   // corner=모서리 둥글기, edge=테두리 두께
+        var tex = new Texture2D(S, S, TextureFormat.RGBA32, false);
+        var px = new Color[S * S];
+        float half = S / 2f;
+        for (int y = 0; y < S; y++)
+            for (int x = 0; x < S; x++)
+            {
+                // 둥근 사각형 경계까지의 부호거리(음수=안쪽)
+                float dx = Mathf.Abs(x + 0.5f - half) - (half - corner);
+                float dy = Mathf.Abs(y + 0.5f - half) - (half - corner);
+                float outside = Mathf.Sqrt(Mathf.Max(dx, 0f) * Mathf.Max(dx, 0f) + Mathf.Max(dy, 0f) * Mathf.Max(dy, 0f))
+                                + Mathf.Min(Mathf.Max(dx, dy), 0f) - corner;
+                // outside ≈ 0 이 경계. |outside| < edge 인 띠만 불투명 → 링
+                float a = 1f - Mathf.SmoothStep(edge - 1.5f, edge, Mathf.Abs(outside));
+                px[y * S + x] = new Color(1f, 1f, 1f, a);
+            }
+        tex.SetPixels(px);
+        tex.Apply();
+        _frostSprite = Sprite.Create(tex, new Rect(0, 0, S, S), new Vector2(0.5f, 0.5f), S);   // PPU=64 → 1칸
+        return _frostSprite;
     }
 
     void StartTint(Color target, float duration)
@@ -69,6 +122,7 @@ public class BlockColor : MonoBehaviour
         //--- 2026-07-09 색 재설정(회색 변환 등) 시 빙결 틴트/상태 해제 — 틴트 코루틴이 새 색을 덮지 않게
         if (_tintCo != null) { StopCoroutine(_tintCo); _tintCo = null; }
         frozenTurns = 0;
+        RemoveFrost();   //--- 2026-07-15 재색칠 시 얼음 테두리도 제거
 
         SpriteRenderer mainSr = GetComponent<SpriteRenderer>();
         if (mainSr != null) mainSr.color = bgColor;

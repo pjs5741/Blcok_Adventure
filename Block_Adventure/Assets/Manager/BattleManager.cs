@@ -60,7 +60,11 @@ public class BattleManager : MonoBehaviour
 
     public bool HasLivingMonster()
     {
-        return currentMonster != null && currentMonster.gameObject.activeSelf;
+        //--- 2026-07-15 데드 페이즈 도입: activeSelf 대신 isDead 기준으로 판정.
+        //    데스모션 재생 중엔 오브젝트가 아직 활성(activeSelf=true)이라 예전 판정은 "살아있음"으로 봤고,
+        //    그 사이 죽어가는 몬스터가 다시 공격하거나 피격되는 버그가 있었음.
+        // (기존: return currentMonster != null && currentMonster.gameObject.activeSelf;)
+        return currentMonster != null && !currentMonster.IsDead;
     }
 
     public IEnumerator ExecuteMonsterAttack()

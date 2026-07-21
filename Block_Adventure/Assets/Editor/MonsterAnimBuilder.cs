@@ -46,6 +46,20 @@ public static class MonsterAnimBuilder
         });
     }
 
+    //--- 2026-07-16 보스 (공격=boss_base_attack 스트립, 특수패턴(폭탄/디스펠)=cast, 판뒤집기=attack 재활용)
+    [MenuItem("Build/Monster Anim — Boss 생성")]
+    public static void BuildBoss()
+    {
+        Build("Boss", new[]
+        {
+            new Def("boss_idle",   "Idle",         null,          8,  true),
+            new Def("boss_attack", "Basic_Attack", "basicAttack", 12, false),
+            new Def("boss_cast",   "Cast_Attack",  "castAttack",  12, false),
+            new Def("boss_hit",    "Hit",          "hit",         12, false),
+            new Def("boss_death",  "Death",        "death",       10, false),
+        });
+    }
+
     //--- 2026-07-14 좀비
     [MenuItem("Build/Monster Anim — Zombie 생성")]
     public static void BuildZombie()

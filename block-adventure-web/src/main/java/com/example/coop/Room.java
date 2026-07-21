@@ -6,7 +6,10 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -16,9 +19,12 @@ import java.util.Random;
 public class Room {
 
     private static final long TURN_TIMEOUT_MS = 15000;
+    //--- 2026-07-20 폴백용 기본 풀(구 클라 호환). 정상 흐름에선 방장이 몹별 풀(intentPool)을 전송하고 그걸 씀.
     //--- 2026-07-09 얼림/시한폭탄 추가 (판 회전은 협동 미지원 — 파트너 미니뷰 그리드 크기 고정 때문)
     //--- 2026-07-13 삼키기(Devour) 추가
     private static final String[] INTENTS = { "RowAttack", "RowAttack", "ConvertBlocks", "Blind", "Freeze", "TimeBomb", "Devour" };
+    //--- 2026-07-20 솔로 Tuning.IntentCooldown(=3)과 동일: 특수 인텐트 재등장 쿨다운(픽 횟수)
+    private static final int INTENT_COOLDOWN = 3;
 
     private final String id;
     private final ObjectMapper mapper;
@@ -37,7 +43,11 @@ public class Room {
     private int monsterSeed;              // 몬스터 프로필 동기화 시드
     private int coopAttackInterval = 3;   // 공격 주기(방장이 전달)
     private int battleTurn;               // 현재 전투의 진행 턴
-    private int lastIntentIdx = -1;       // 직전 인텐트(연속 방지)
+    //--- 2026-07-20 이 전투 몹의 인텐트 풀(방장 전송, 없으면 INTENTS 폴백) + 특수 인텐트 쿨다운 (솔로 PickIntent와 동일 규칙)
+    private String[] battleIntents;
+    private final Map<String, Integer> intentCooldown = new HashMap<>();
+    //--- 2026-07-20 다음 공격에 쓸 인텐트를 한 사이클 미리 정해둠(예고/텔레그래프용). resolve마다 nextIntent로 전송.
+    private String pendingIntent = "None";
 
     private final boolean[] turnReady = new boolean[2];
     private final int[] dmg = new int[2];
@@ -114,8 +124,18 @@ public class Room {
             monsterMaxHp = Math.max(1, node.path("monsterHp").asInt(600));
             monsterHp = monsterMaxHp;
             coopAttackInterval = Math.max(1, node.path("attackInterval").asInt(3));
+            //--- 2026-07-20 몹별 인텐트 풀(방장이 MonsterRegistry에서 뽑아 전송, Pivot 제외). 없으면 기본 INTENTS 폴백.
+            JsonNode pool = node.path("intentPool");
+            if (pool.isArray() && pool.size() > 0) {
+                battleIntents = new String[pool.size()];
+                for (int k = 0; k < pool.size(); k++) battleIntents[k] = pool.get(k).asText();
+            } else {
+                battleIntents = null;
+            }
+            intentCooldown.clear();
+            pendingIntent = pickIntent();   //--- 2026-07-20 첫 공격 인텐트 미리 정함(전투 시작부터 예고 가능)
             inBattle = true;
-            battleTurn = 0; lastIntentIdx = -1;
+            battleTurn = 0;
             turnReady[0] = turnReady[1] = false; dmg[0] = dmg[1] = 0; firstReadyAt = 0;
         }
         // 전투/비전투 모두 goNode 전송 → 클라가 노드 타입 보고 씬(전투/상점/휴식/이벤트) 라우팅. 비전투면 턴 루프 없음.
@@ -171,26 +191,41 @@ public class Room {
         }
     }
 
+    //--- 2026-07-20 솔로 Monster.PickIntent와 동일 규칙: 몹별 풀에서 쿨다운 안 걸린 후보 중 랜덤(중복=RowAttack 가중치).
+    // 픽 시점마다 쿨다운 1 감소, 특수 인텐트는 뽑히면 INTENT_COOLDOWN회 쿨다운. 후보 없으면 RowAttack 폴백.
+    private String pickIntent() {
+        String[] pool = (battleIntents != null && battleIntents.length > 0) ? battleIntents : INTENTS;
+        for (Map.Entry<String, Integer> e : intentCooldown.entrySet())
+            if (e.getValue() > 0) e.setValue(e.getValue() - 1);
+        List<String> cand = new ArrayList<>();
+        for (String it : pool)
+            if (intentCooldown.getOrDefault(it, 0) <= 0) cand.add(it);
+        String picked = cand.isEmpty() ? "RowAttack" : cand.get(rng.nextInt(cand.size()));
+        if (!"RowAttack".equals(picked)) intentCooldown.put(picked, INTENT_COOLDOWN);
+        return picked;
+    }
+
     private void resolve() {
         int total = (turnReady[0] ? dmg[0] : 0) + (turnReady[1] ? dmg[1] : 0);
         monsterHp = Math.max(0, monsterHp - total);
         boolean dead = monsterHp <= 0;
 
-        //--- 2026-07-03 공격 주기: 매 턴이 아니라 attackInterval마다만 인텐트 발동(그 외엔 None). 연속 인텐트 방지.
+        //--- 2026-07-03 공격 주기: attackInterval마다만 인텐트 발동(그 외 턴은 발동 None).
+        //--- 2026-07-20 발동 인텐트는 지난 사이클에 미리 정해둔 pendingIntent(예고했던 것). 발동 후 다음 것을 새로 뽑아 예고.
+        //    nextIntent를 매 resolve에 실어 보내 클라가 카운트다운 동안 예고(텔레그래프)하게 함 → 솔로와 동일.
         battleTurn++;
-        String intent = "None";
+        String fireIntent = "None";
         if (battleTurn % coopAttackInterval == 0)
         {
-            int idx;
-            do { idx = rng.nextInt(INTENTS.length); } while (INTENTS.length > 1 && idx == lastIntentIdx);
-            lastIntentIdx = idx;
-            intent = INTENTS[idx];
+            fireIntent = pendingIntent;       // 이번 턴 발동 = 예고했던 인텐트
+            pendingIntent = pickIntent();     // 다음 공격 인텐트 미리 정함(예고용)
         }
         int attackCountdown = coopAttackInterval - (battleTurn % coopAttackInterval);   // 다음 공격까지 남은 턴
         for (int i = 0; i < 2; i++) {
             int partnerDmg = turnReady[1 - i] ? dmg[1 - i] : 0;   // 상대가 이번 턴 준 데미지(버디 공격 연출용)
             Map<String, Object> msg = obj("type", "resolve", "monsterHp", monsterHp,
-                    "monsterMaxHp", monsterMaxHp, "monsterDead", dead, "intent", intent,
+                    "monsterMaxHp", monsterMaxHp, "monsterDead", dead, "intent", fireIntent,
+                    "nextIntent", pendingIntent,   //--- 2026-07-20 다음 공격 예고(클라 텔레그래프)
                     "partnerDamage", partnerDmg, "attackCountdown", attackCountdown);
             msg.put("partnerGrid", grid[1 - i]);
             send(i, msg);

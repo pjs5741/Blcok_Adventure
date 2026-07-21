@@ -302,6 +302,9 @@ public partial class BlockGrid
             mon.transform.localScale = s0;
         }
         _devouring = false;
+
+        //--- 2026-07-15 삼킨 만큼 슬라임 성장/강화 (실제 삼킨 개수 전달, 0개면 성장 없음)
+        if (mon != null) mon.OnDevoured(eaten);
     }
 
     // 블록 하나가 나선을 그리며 입으로 빨려 들어감 (자전 + 축소)

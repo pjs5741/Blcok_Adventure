@@ -13,6 +13,7 @@ public class TelegraphMark : MonoBehaviour
         var go = new GameObject("TelegraphMark");
         go.transform.SetParent(parent);
         go.transform.position = new Vector3(cell.x, cell.y, -0.05f);   // 블록 살짝 앞
+        go.transform.localScale = Vector3.one * 1.06f;   //--- 2026-07-15 살짝 크게 → 블록 테두리로 예고가 삐져나와 눈에 띔
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = GetSprite();
         sr.color = color;
